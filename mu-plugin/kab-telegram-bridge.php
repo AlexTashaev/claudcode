@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'KAB_TELEGRAM_BRIDGE_DIR', __DIR__ . '/kab-telegram-bridge/' );
+define( 'KAB_TELEGRAM_BRIDGE_DIR', plugin_dir_path( __FILE__ ) . 'kab-telegram-bridge/' );
 define( 'KAB_TELEGRAM_BRIDGE_VER', '1.0.0' );
 
 require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-telegram-guard.php';
