@@ -35,22 +35,24 @@
    - **Show User Photo:** по желанию
    - **Corner Radius:** 15
    - **Show if user is:** Logged Out
-   - **Disable Sign up:** ВКЛ (наш mu-plugin тоже это гарантирует программно)
-   - **Redirect After Login:** оставьте Default (mu-plugin управляет редиректом)
+   - **Disable Sign up:** ВКЛ (наш плагин тоже это гарантирует программно)
+   - **Redirect After Login:** оставьте Default (плагин управляет редиректом)
 6. Сохраните
 
 ---
 
-## Шаг 3: Установка WordPress mu-plugin
+## Шаг 3: Установка WordPress-плагина
 
-1. Скопируйте `mu-plugin/kab-telegram-bridge.php` в `wp-content/mu-plugins/`
-2. Создайте директорию `wp-content/mu-plugins/kab-telegram-bridge/`
-3. Скопируйте все файлы из `mu-plugin/kab-telegram-bridge/` в эту директорию
+1. В админке WordPress: **Плагины → Добавить → Загрузить плагин**
+2. Выберите файл `wp-telegram.zip`
+3. Нажмите **Установить** → **Активировать**
+
+Или вручную: распакуйте `wp-telegram.zip` в `wp-content/plugins/`
 
 Структура должна быть:
 
 ```
-wp-content/mu-plugins/
+wp-content/plugins/wp-telegram/
 ├── kab-telegram-bridge.php
 └── kab-telegram-bridge/
     ├── class-kab-telegram-guard.php
@@ -59,18 +61,22 @@ wp-content/mu-plugins/
     └── class-kab-login-customizer.php
 ```
 
-4. Проверьте в админке: **Плагины → Must-Use** — должен отображаться «KAB Academy Telegram Bridge»
+4. Проверьте в админке: **Плагины** — должен отображаться «KAB Academy Telegram Bridge» (активирован)
 
 ---
 
 ## Шаг 4: Установка Moodle auth plugin
 
-1. Скопируйте директорию `moodle-auth-plugin/telegram_wp/` в `moodle/auth/telegram_wp/`
+1. В Moodle: **Site administration → Plugins → Install plugins**
+2. Выберите файл `moodle-telegram.zip`
+3. Нажмите **Install plugin from the ZIP file**
+
+Или вручную: распакуйте `moodle-telegram.zip` в `moodle/auth/`
 
 Структура:
 
 ```
-moodle/auth/telegram_wp/
+moodle/auth/moodle-telegram/
 ├── auth.php
 ├── version.php
 ├── settings.php
