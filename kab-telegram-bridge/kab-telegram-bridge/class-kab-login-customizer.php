@@ -252,10 +252,17 @@ class KAB_Login_Customizer {
     }
 
     /**
-     * Intercept wp_redirect during Telegram login callback to redirect to Moodle.
+     * Intercept wp_redirect during Telegram login callback.
      *
      * This fires for ALL wp_redirect calls, so we only modify the redirect
-     * when we detect a Telegram login callback AND have a stored Moodle URL.
+     * when we detect a Telegram login callback AND have a target URL.
+     *
+     * Key insight: Edwiser Bridge SSO hooks wp_login and redirects to
+     * edu.kabacademy.com/auth/edwiserbridge/?wantsurl=... Moodle validates
+     * wantsurl and only accepts Moodle-domain URLs, so we cannot put a
+     * WordPress URL there. Instead:
+     * - For Moodle targets: modify wantsurl (same domain, will be accepted).
+     * - For WordPress targets: bypass EB SSO entirely and redirect to WP page.
      *
      * @param string $location The redirect URL.
      * @return string Modified redirect URL.
@@ -271,26 +278,30 @@ class KAB_Login_Customizer {
         $moodle_url = self::get_moodle_redirect_url();
         $return_url = self::get_return_url();
 
-        // Determine the target: Moodle URL takes priority, then saved return URL.
-        $target_url = $moodle_url ? $moodle_url : $return_url;
-
-        if ( ! $target_url ) {
-            kab_log( 'intercept_telegram_login_redirect: No Moodle or return URL found, keeping original.' );
-            return $location;
+        // 1. Moodle redirect takes priority (user came from Moodle).
+        if ( $moodle_url ) {
+            if ( false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
+                // Moodle URL in wantsurl — Moodle will accept it (same domain).
+                $modified = remove_query_arg( array( 'wantsurl', 'redirect_to' ), $location );
+                $modified = add_query_arg( 'wantsurl', rawurlencode( $moodle_url ), $modified );
+                kab_log( 'intercept_telegram_login_redirect: EB SSO + Moodle wantsurl: ' . $modified );
+                return $modified;
+            }
+            kab_log( 'intercept_telegram_login_redirect: Moodle redirect: ' . $moodle_url );
+            return $moodle_url;
         }
 
-        // If Edwiser Bridge SSO is redirecting through its endpoint,
-        // preserve the SSO flow and append our target URL as the final
-        // destination so the user ends up on the right page after SSO.
-        if ( false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
-            $modified = remove_query_arg( array( 'wantsurl', 'redirect_to' ), $location );
-            $modified = add_query_arg( 'wantsurl', rawurlencode( $target_url ), $modified );
-            kab_log( 'intercept_telegram_login_redirect: EB SSO detected, modified: ' . $modified );
-            return $modified;
+        // 2. WordPress return URL (course page the user was viewing).
+        //    Bypass EB SSO entirely — Moodle rejects non-Moodle wantsurl.
+        //    The user will be redirected straight to the WP page.
+        //    Moodle SSO will happen on the next Moodle visit via EB's JS-based SSO.
+        if ( $return_url ) {
+            kab_log( 'intercept_telegram_login_redirect: Bypassing EB SSO, returning to WP page: ' . $return_url );
+            return $return_url;
         }
 
-        kab_log( 'intercept_telegram_login_redirect: Redirecting to: ' . $target_url );
-        return $target_url;
+        kab_log( 'intercept_telegram_login_redirect: No target URL found, keeping original.' );
+        return $location;
     }
 
     /**
@@ -330,33 +341,52 @@ class KAB_Login_Customizer {
     /**
      * Get the return URL saved before Telegram login (the page the user was on).
      *
+     * Checks multiple sources in order of reliability:
+     * 1. redirect_to query parameter (set by WP Telegram Login "Current page")
+     * 2. kab_return_to cookie (set by our save_return_url on course pages)
+     * 3. kab_return_to transient (fallback when cookie doesn't survive)
+     *
      * @return string|false Return URL or false.
      */
     private static function get_return_url() {
         $url = '';
 
-        // 1. Check cookie set by KAB_Telegram_Widget::save_return_url().
-        if ( ! empty( $_COOKIE['kab_return_to'] ) ) {
-            $url = esc_url_raw( wp_unslash( $_COOKIE['kab_return_to'] ) );
-            // Clear the cookie after reading.
-            setcookie( 'kab_return_to', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+        // 1. Check redirect_to from the request — WP Telegram Login's "Current page"
+        //    option passes the originating page URL as this query parameter.
+        // phpcs:ignore WordPress.Security.NonceVerification
+        if ( ! empty( $_REQUEST['redirect_to'] ) ) {
+            $candidate = esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) );
+            // Only use it if it's a local (same-site) URL, not a Moodle/external URL.
+            if ( $candidate && wp_validate_redirect( $candidate, false ) ) {
+                $url = $candidate;
+                kab_log( 'get_return_url: Found redirect_to in request: ' . $url );
+            }
         }
 
-        // 2. Fallback: check transient.
+        // 2. Check cookie set by KAB_Telegram_Widget::save_return_url().
+        if ( empty( $url ) && ! empty( $_COOKIE['kab_return_to'] ) ) {
+            $url = esc_url_raw( wp_unslash( $_COOKIE['kab_return_to'] ) );
+            setcookie( 'kab_return_to', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+            kab_log( 'get_return_url: Found cookie kab_return_to: ' . $url );
+        }
+
+        // 3. Fallback: check transient.
         if ( empty( $url ) ) {
             $transient_key = 'kab_return_to_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
             $url           = get_transient( $transient_key );
             if ( $url ) {
                 delete_transient( $transient_key );
+                kab_log( 'get_return_url: Found transient: ' . $url );
             }
         }
 
         // Validate: only allow redirects to the same site.
         if ( $url && wp_validate_redirect( $url, false ) ) {
-            kab_log( 'get_return_url: Found return URL: ' . $url );
+            kab_log( 'get_return_url: Validated return URL: ' . $url );
             return $url;
         }
 
+        kab_log( 'get_return_url: No valid return URL found. REQUEST keys=' . implode( ',', array_keys( $_REQUEST ?? array() ) ) );
         return false;
     }
 
