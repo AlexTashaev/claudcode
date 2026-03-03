@@ -32,8 +32,12 @@ add_action( 'plugins_loaded', function () {
         return;
     }
 
-    KAB_Telegram_Guard::init();
-    KAB_Moodle_Linker::init();
-    KAB_Telegram_Widget::init();
-    KAB_Login_Customizer::init();
+    try {
+        KAB_Telegram_Guard::init();
+        KAB_Moodle_Linker::init();
+        KAB_Telegram_Widget::init();
+        KAB_Login_Customizer::init();
+    } catch ( \Throwable $e ) {
+        error_log( 'KAB Telegram Bridge: Init failed — ' . $e->getMessage() );
+    }
 }, 20 );

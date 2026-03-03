@@ -153,34 +153,39 @@ class KAB_Login_Customizer {
      * @param WP_User $user        Logged-in user.
      * @return string Final redirect URL.
      */
-    public static function custom_redirect_after_login( $redirect_to, $user ) {
-        // If user came from Moodle, send them back.
-        // phpcs:ignore WordPress.Security.NonceVerification
-        $moodle_url = isset( $_REQUEST['moodle_redirect_to'] )
-            ? esc_url_raw( wp_unslash( $_REQUEST['moodle_redirect_to'] ) )
-            : '';
+    public static function custom_redirect_after_login( $redirect_to, $user = null ) {
+        try {
+            // If user came from Moodle, send them back.
+            // phpcs:ignore WordPress.Security.NonceVerification
+            $moodle_url = isset( $_REQUEST['moodle_redirect_to'] )
+                ? esc_url_raw( wp_unslash( $_REQUEST['moodle_redirect_to'] ) )
+                : '';
 
-        // Fallback: check the cookie set by handle_telegram_login_page().
-        if ( empty( $moodle_url ) && ! empty( $_COOKIE['kab_moodle_redirect'] ) ) {
-            $moodle_url = esc_url_raw( wp_unslash( $_COOKIE['kab_moodle_redirect'] ) );
-            // Clear the cookie.
-            setcookie( 'kab_moodle_redirect', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
-        }
-
-        if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
-            return $moodle_url;
-        }
-
-        // Redirect to Edwiser Bridge user account page if available.
-        $eb_page_id = get_option( 'eb_useraccount_page_id' );
-        if ( $eb_page_id ) {
-            $account_url = get_permalink( $eb_page_id );
-            if ( $account_url ) {
-                return $account_url;
+            // Fallback: check the cookie set by handle_telegram_login_page().
+            if ( empty( $moodle_url ) && ! empty( $_COOKIE['kab_moodle_redirect'] ) ) {
+                $moodle_url = esc_url_raw( wp_unslash( $_COOKIE['kab_moodle_redirect'] ) );
+                // Clear the cookie.
+                setcookie( 'kab_moodle_redirect', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
             }
-        }
 
-        return admin_url();
+            if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
+                return $moodle_url;
+            }
+
+            // Redirect to Edwiser Bridge user account page if available.
+            $eb_page_id = get_option( 'eb_useraccount_page_id' );
+            if ( $eb_page_id ) {
+                $account_url = get_permalink( $eb_page_id );
+                if ( $account_url ) {
+                    return $account_url;
+                }
+            }
+
+            return admin_url();
+        } catch ( \Throwable $e ) {
+            error_log( 'KAB Telegram Bridge: Redirect filter failed — ' . $e->getMessage() );
+            return $redirect_to;
+        }
     }
 
     /**

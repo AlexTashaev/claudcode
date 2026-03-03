@@ -84,7 +84,7 @@ class KAB_Moodle_Linker {
             $eb = edwiser_bridge_instance();
             if ( $eb && method_exists( $eb, 'user_manager' ) ) {
                 $manager = $eb->user_manager();
-                if ( method_exists( $manager, 'link_moodle_user' ) ) {
+                if ( $manager && method_exists( $manager, 'link_moodle_user' ) ) {
                     $manager->link_moodle_user( $user );
                     error_log(
                         sprintf(
@@ -95,7 +95,7 @@ class KAB_Moodle_Linker {
                     );
                 }
             }
-        } catch ( Exception $e ) {
+        } catch ( \Throwable $e ) {
             error_log( 'KAB Telegram Bridge: Failed to link user to Moodle — ' . $e->getMessage() );
         }
     }

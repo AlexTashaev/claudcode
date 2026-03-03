@@ -50,6 +50,8 @@ class auth_plugin_telegram_wp extends auth_plugin_base {
      * @return array Array of identity provider entries.
      */
     public function loginpage_idp_list( $wantsurl ) {
+        global $CFG;
+
         $wp_url = $this->get_wp_login_url();
         if ( empty( $wp_url ) ) {
             return array();
@@ -60,8 +62,11 @@ class auth_plugin_telegram_wp extends auth_plugin_base {
             'telegram_login' => '1',
         );
 
-        if ( ! empty( $wantsurl ) ) {
+        // Use wantsurl if it's a valid absolute URL, otherwise fall back to Moodle site root.
+        if ( ! empty( $wantsurl ) && filter_var( $wantsurl, FILTER_VALIDATE_URL ) ) {
             $params['moodle_redirect_to'] = $wantsurl;
+        } else {
+            $params['moodle_redirect_to'] = $CFG->wwwroot;
         }
 
         $login_url = new moodle_url( $wp_url, $params );
