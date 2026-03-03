@@ -46,18 +46,35 @@ register_shutdown_function( function () {
     }
 } );
 
-// Early callback detection — catches ALL Telegram login callbacks before WP Telegram Login processes them.
+// Early callback detection — catches ALL Telegram login callbacks.
 add_action( 'init', function () {
+    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+
+    // Detect action-based callback (admin-ajax.php?action=wptelegram_login).
     // phpcs:ignore WordPress.Security.NonceVerification
     if ( isset( $_REQUEST['action'] ) && 'wptelegram_login' === $_REQUEST['action'] ) {
-        kab_log( '>>> TELEGRAM CALLBACK DETECTED on init. GET=' . wp_json_encode( $_GET ) );
-        kab_log( '>>> REQUEST_URI=' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown' ) );
+        kab_log( '>>> TELEGRAM CALLBACK (action) on init. GET=' . wp_json_encode( $_GET ) );
+        kab_log( '>>> REQUEST_URI=' . $uri );
     }
-    // Also detect REST API callback (newer WP Telegram Login versions).
-    if ( isset( $_SERVER['REQUEST_URI'] ) && false !== strpos( $_SERVER['REQUEST_URI'], 'wptelegram-login' ) ) {
-        kab_log( '>>> TELEGRAM REST CALLBACK DETECTED. URI=' . $_SERVER['REQUEST_URI'] );
+
+    // Detect REST API callback (newer WP Telegram Login versions).
+    if ( false !== stripos( $uri, 'wptelegram' ) || false !== stripos( $uri, 'telegram' ) ) {
+        kab_log( '>>> TELEGRAM REQUEST. URI=' . $uri );
     }
 }, 1 );
+
+// Detect any login — wp_set_auth_cookie fires even when wp_login does not.
+add_action( 'set_auth_cookie', function ( $auth_cookie, $expire, $expiration, $user_id ) {
+    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown';
+    kab_log( 'set_auth_cookie fired for user_id=' . $user_id . ' | URI=' . $uri );
+}, 10, 4 );
+
+// Detect wp_login — should fire on login but may not in REST context.
+add_action( 'wp_login', function ( $user_login ) {
+    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown';
+    kab_log( 'wp_login fired for: ' . $user_login . ' | URI=' . $uri );
+}, 1 );
+
 
 add_action( 'plugins_loaded', function () {
     kab_log( 'plugins_loaded fired. WPTELEGRAM_LOGIN_VER=' . ( defined( 'WPTELEGRAM_LOGIN_VER' ) ? WPTELEGRAM_LOGIN_VER : 'NOT DEFINED' ) );
