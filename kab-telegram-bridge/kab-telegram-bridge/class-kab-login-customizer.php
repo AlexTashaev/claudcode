@@ -20,8 +20,12 @@ class KAB_Login_Customizer {
         // Custom Telegram login page — works even when wp-login.php is hidden.
         add_action( 'template_redirect', array( __CLASS__, 'handle_telegram_login_page' ) );
 
-        // Intercept ANY redirect during Telegram login to redirect to Moodle.
-        // This works regardless of WP Telegram Login plugin version.
+        // PRIMARY: Redirect BEFORE EB SSO gets a chance to run.
+        // EB SSO hooks wp_login at priority 10. We hook at priority 8 and call
+        // wp_redirect + exit, so EB SSO never executes during Telegram login.
+        add_action( 'wp_login', array( __CLASS__, 'redirect_before_eb_sso' ), 8, 2 );
+
+        // BACKUP: Intercept wp_redirect in case EB SSO still fires.
         add_filter( 'wp_redirect', array( __CLASS__, 'intercept_telegram_login_redirect' ), 999 );
 
         // Also try the plugin-specific filter (may exist in other versions).
@@ -165,6 +169,44 @@ class KAB_Login_Customizer {
             }
         </style>
         <?php
+    }
+
+    /**
+     * PRIMARY redirect handler: runs on wp_login at priority 8.
+     *
+     * EB SSO hooks wp_login at priority 10 and does a hard redirect to Moodle
+     * (possibly via header() directly, bypassing wp_redirect filters).
+     * By hooking at priority 8, we redirect and exit BEFORE EB SSO runs.
+     *
+     * @param string  $user_login Username.
+     * @param WP_User $user       User object.
+     */
+    public static function redirect_before_eb_sso( $user_login, $user ) {
+        if ( ! kab_is_telegram_callback() ) {
+            return;
+        }
+
+        kab_log( 'redirect_before_eb_sso: Telegram login detected for user=' . $user_login );
+        kab_log( 'redirect_before_eb_sso: COOKIE keys=' . implode( ',', array_keys( $_COOKIE ?? array() ) ) );
+        kab_log( 'redirect_before_eb_sso: REQUEST keys=' . implode( ',', array_keys( $_REQUEST ?? array() ) ) );
+        kab_log( 'redirect_before_eb_sso: REQUEST redirect_to=' . ( $_REQUEST['redirect_to'] ?? 'NOT SET' ) );
+
+        // Moodle redirect takes priority — let EB SSO handle it with our wantsurl fix.
+        $moodle_url = self::get_moodle_redirect_url();
+        if ( $moodle_url ) {
+            kab_log( 'redirect_before_eb_sso: Moodle URL found, deferring to EB SSO.' );
+            return;
+        }
+
+        // WordPress return URL — redirect immediately, before EB SSO.
+        $return_url = self::get_return_url();
+        if ( $return_url ) {
+            kab_log( 'redirect_before_eb_sso: REDIRECTING to ' . $return_url . ' (bypassing EB SSO)' );
+            wp_redirect( $return_url );
+            exit;
+        }
+
+        kab_log( 'redirect_before_eb_sso: No return URL found, deferring to EB SSO.' );
     }
 
     /**
