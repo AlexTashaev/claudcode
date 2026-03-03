@@ -14,6 +14,31 @@ class KAB_Telegram_Widget {
         add_filter( 'the_content', array( __CLASS__, 'add_telegram_to_course_pages' ) );
 
         add_shortcode( 'kab_telegram_login', array( __CLASS__, 'telegram_login_shortcode' ) );
+
+        // Save the current page URL so we can redirect back after Telegram login.
+        add_action( 'template_redirect', array( __CLASS__, 'save_return_url' ) );
+    }
+
+    /**
+     * Save the current page URL in a cookie before Telegram login starts.
+     *
+     * When a non-logged-in user views a course page (where the Telegram widget
+     * is shown), we store the URL so we can redirect them back after login.
+     */
+    public static function save_return_url() {
+        if ( is_user_logged_in() || ! is_singular( 'eb_course' ) ) {
+            return;
+        }
+
+        $current_url = esc_url_raw( home_url( $_SERVER['REQUEST_URI'] ?? '/' ) );
+
+        setcookie( 'kab_return_to', $current_url, time() + 600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+
+        // Also save as transient keyed by IP — fallback if cookie doesn't survive.
+        $transient_key = 'kab_return_to_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
+        set_transient( $transient_key, $current_url, 600 );
+
+        kab_log( 'save_return_url: Saved return URL: ' . $current_url );
     }
 
     /**

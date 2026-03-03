@@ -188,6 +188,13 @@ class KAB_Login_Customizer {
                 return $moodle_url;
             }
 
+            // Return user to the page they were on before Telegram login.
+            $return_url = self::get_return_url();
+            if ( $return_url ) {
+                kab_log( 'custom_redirect_after_login: Return URL: ' . $return_url );
+                return $return_url;
+            }
+
             // Redirect to Edwiser Bridge user account page if available.
             $eb_page_id = get_option( 'eb_useraccount_page_id' );
             if ( $eb_page_id ) {
@@ -262,23 +269,28 @@ class KAB_Login_Customizer {
         kab_log( 'intercept_telegram_login_redirect: Original location: ' . $location );
 
         $moodle_url = self::get_moodle_redirect_url();
-        if ( ! $moodle_url ) {
-            kab_log( 'intercept_telegram_login_redirect: No Moodle URL found, keeping original.' );
+        $return_url = self::get_return_url();
+
+        // Determine the target: Moodle URL takes priority, then saved return URL.
+        $target_url = $moodle_url ? $moodle_url : $return_url;
+
+        if ( ! $target_url ) {
+            kab_log( 'intercept_telegram_login_redirect: No Moodle or return URL found, keeping original.' );
             return $location;
         }
 
         // If Edwiser Bridge SSO is redirecting through its endpoint,
-        // preserve the SSO flow and append our Moodle URL as the final
+        // preserve the SSO flow and append our target URL as the final
         // destination so the user ends up on the right page after SSO.
         if ( false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
             $modified = remove_query_arg( array( 'wantsurl', 'redirect_to' ), $location );
-            $modified = add_query_arg( 'wantsurl', rawurlencode( $moodle_url ), $modified );
+            $modified = add_query_arg( 'wantsurl', rawurlencode( $target_url ), $modified );
             kab_log( 'intercept_telegram_login_redirect: EB SSO detected, modified: ' . $modified );
             return $modified;
         }
 
-        kab_log( 'intercept_telegram_login_redirect: Redirecting to Moodle: ' . $moodle_url );
-        return $moodle_url;
+        kab_log( 'intercept_telegram_login_redirect: Redirecting to: ' . $target_url );
+        return $target_url;
     }
 
     /**
@@ -310,6 +322,39 @@ class KAB_Login_Customizer {
 
         if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
             return $moodle_url;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the return URL saved before Telegram login (the page the user was on).
+     *
+     * @return string|false Return URL or false.
+     */
+    private static function get_return_url() {
+        $url = '';
+
+        // 1. Check cookie set by KAB_Telegram_Widget::save_return_url().
+        if ( ! empty( $_COOKIE['kab_return_to'] ) ) {
+            $url = esc_url_raw( wp_unslash( $_COOKIE['kab_return_to'] ) );
+            // Clear the cookie after reading.
+            setcookie( 'kab_return_to', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+        }
+
+        // 2. Fallback: check transient.
+        if ( empty( $url ) ) {
+            $transient_key = 'kab_return_to_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
+            $url           = get_transient( $transient_key );
+            if ( $url ) {
+                delete_transient( $transient_key );
+            }
+        }
+
+        // Validate: only allow redirects to the same site.
+        if ( $url && wp_validate_redirect( $url, false ) ) {
+            kab_log( 'get_return_url: Found return URL: ' . $url );
+            return $url;
         }
 
         return false;
