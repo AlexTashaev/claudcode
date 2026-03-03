@@ -4,7 +4,7 @@
  * Description: Customizes WP Telegram Login integration for kabacademy.com.
  *              Enforces existing-users-only login, ensures Moodle linking via
  *              Edwiser Bridge, and provides custom widget placement.
- * Version: 1.0.1
+ * Version: 1.1.0
  * Author: KAB Academy
  */
 
@@ -13,17 +13,47 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'KAB_TELEGRAM_BRIDGE_DIR', plugin_dir_path( __FILE__ ) . 'kab-telegram-bridge/' );
-define( 'KAB_TELEGRAM_BRIDGE_VER', '1.0.1' );
+define( 'KAB_TELEGRAM_BRIDGE_VER', '1.1.0' );
 
 /**
  * Write to our own log file so we can debug without WP_DEBUG.
+ * Log is stored outside the webroot-accessible directory structure.
  *
  * @param string $message Log message.
  */
 function kab_log( $message ) {
-    $log_file = WP_CONTENT_DIR . '/kab-debug.log';
+    $log_dir = WP_CONTENT_DIR . '/kab-logs';
+    if ( ! is_dir( $log_dir ) ) {
+        wp_mkdir_p( $log_dir );
+        // Protect directory from web access.
+        file_put_contents( $log_dir . '/.htaccess', "Deny from all\n" ); // phpcs:ignore
+        file_put_contents( $log_dir . '/index.php', '<?php // Silence is golden.' ); // phpcs:ignore
+    }
+    $log_file = $log_dir . '/kab-debug.log';
     $time     = gmdate( 'Y-m-d H:i:s' );
     file_put_contents( $log_file, "[{$time}] {$message}\n", FILE_APPEND | LOCK_EX ); // phpcs:ignore
+}
+
+/**
+ * Detect whether the current request is a Telegram login callback.
+ * Works with both admin-ajax (v1) and REST API (v2+) versions of WP Telegram Login.
+ *
+ * @return bool
+ */
+function kab_is_telegram_callback() {
+    // Legacy: admin-ajax.php?action=wptelegram_login.
+    // phpcs:ignore WordPress.Security.NonceVerification
+    if ( isset( $_REQUEST['action'] ) && 'wptelegram_login' === $_REQUEST['action'] ) {
+        return true;
+    }
+
+    // Modern: REST API endpoint /wp-json/wptelegram-login/v1/...
+    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+    if ( false !== strpos( $uri, 'wptelegram-login' ) ) {
+        return true;
+    }
+
+    return false;
 }
 
 // Wrap require_once in try/catch — parse errors in class files would be fatal.
@@ -46,20 +76,11 @@ register_shutdown_function( function () {
     }
 } );
 
-// Early callback detection — catches ALL Telegram login callbacks.
+// Early callback detection — catches ALL Telegram login callbacks (AJAX and REST API).
 add_action( 'init', function () {
-    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
-
-    // Detect action-based callback (admin-ajax.php?action=wptelegram_login).
-    // phpcs:ignore WordPress.Security.NonceVerification
-    if ( isset( $_REQUEST['action'] ) && 'wptelegram_login' === $_REQUEST['action'] ) {
-        kab_log( '>>> TELEGRAM CALLBACK (action) on init. GET=' . wp_json_encode( $_GET ) );
-        kab_log( '>>> REQUEST_URI=' . $uri );
-    }
-
-    // Detect REST API callback (newer WP Telegram Login versions).
-    if ( false !== stripos( $uri, 'wptelegram' ) || false !== stripos( $uri, 'telegram' ) ) {
-        kab_log( '>>> TELEGRAM REQUEST. URI=' . $uri );
+    if ( kab_is_telegram_callback() ) {
+        $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+        kab_log( '>>> TELEGRAM CALLBACK on init. URI=' . $uri );
     }
 }, 1 );
 

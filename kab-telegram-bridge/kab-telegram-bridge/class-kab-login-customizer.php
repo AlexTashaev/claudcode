@@ -58,9 +58,14 @@ class KAB_Login_Customizer {
             ? esc_url_raw( wp_unslash( $_GET['moodle_redirect_to'] ) )
             : '';
 
-        // Store moodle_redirect_to in a cookie so it survives the Telegram auth callback.
+        // Store moodle_redirect_to so it survives the Telegram auth callback.
+        // Use both cookie and transient for reliability (cookie may not arrive
+        // if COOKIE_DOMAIN/COOKIEPATH differ between the initial request and callback).
         if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
             setcookie( 'kab_moodle_redirect', $moodle_url, time() + 600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+            // Transient keyed by visitor IP — short-lived, used as fallback.
+            $transient_key = 'kab_moodle_redir_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
+            set_transient( $transient_key, $moodle_url, 600 );
         }
 
         // If already logged in, redirect immediately.
@@ -175,31 +180,11 @@ class KAB_Login_Customizer {
     public static function custom_redirect_after_login( $redirect_to, $user = null ) {
         try {
             kab_log( 'custom_redirect_after_login called. redirect_to=' . $redirect_to );
-            // If user came from Moodle, send them back.
-            // phpcs:ignore WordPress.Security.NonceVerification
-            $moodle_url = isset( $_REQUEST['moodle_redirect_to'] )
-                ? esc_url_raw( wp_unslash( $_REQUEST['moodle_redirect_to'] ) )
-                : '';
 
-            // Fallback: check the cookie set by handle_telegram_login_page().
-            if ( empty( $moodle_url ) && ! empty( $_COOKIE['kab_moodle_redirect'] ) ) {
-                $moodle_url = esc_url_raw( wp_unslash( $_COOKIE['kab_moodle_redirect'] ) );
-                // Clear the cookie.
-                setcookie( 'kab_moodle_redirect', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
-            }
+            $moodle_url = self::get_moodle_redirect_url();
 
-            if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
-                // Try to let EB SSO generate a proper SSO redirect URL.
-                // EB SSO may hook into login_redirect filter.
-                $user_obj = ( $user instanceof WP_User ) ? $user : wp_get_current_user();
-                $sso_url  = apply_filters( 'login_redirect', $moodle_url, $moodle_url, $user_obj );
-
-                if ( $sso_url && $sso_url !== $moodle_url ) {
-                    kab_log( 'custom_redirect_after_login: EB SSO via login_redirect: ' . $sso_url );
-                    return $sso_url;
-                }
-
-                kab_log( 'custom_redirect_after_login: Direct Moodle redirect: ' . $moodle_url );
+            if ( $moodle_url ) {
+                kab_log( 'custom_redirect_after_login: Moodle redirect: ' . $moodle_url );
                 return $moodle_url;
             }
 
@@ -214,7 +199,7 @@ class KAB_Login_Customizer {
 
             return admin_url();
         } catch ( \Throwable $e ) {
-            error_log( 'KAB Telegram Bridge: Redirect filter failed — ' . $e->getMessage() );
+            kab_log( 'custom_redirect_after_login ERROR: ' . $e->getMessage() );
             return $redirect_to;
         }
     }
@@ -227,8 +212,7 @@ class KAB_Login_Customizer {
      * @param WP_User $user       User object.
      */
     public static function diagnose_after_eb_sso( $user_login, $user ) {
-        // phpcs:ignore WordPress.Security.NonceVerification
-        if ( ! isset( $_REQUEST['action'] ) || 'wptelegram_login' !== $_REQUEST['action'] ) {
+        if ( ! kab_is_telegram_callback() ) {
             return;
         }
 
@@ -264,15 +248,14 @@ class KAB_Login_Customizer {
      * Intercept wp_redirect during Telegram login callback to redirect to Moodle.
      *
      * This fires for ALL wp_redirect calls, so we only modify the redirect
-     * when we detect a Telegram login action AND have a stored Moodle URL.
+     * when we detect a Telegram login callback AND have a stored Moodle URL.
      *
      * @param string $location The redirect URL.
      * @return string Modified redirect URL.
      */
     public static function intercept_telegram_login_redirect( $location ) {
-        // Only intercept during Telegram login callback.
-        // phpcs:ignore WordPress.Security.NonceVerification
-        if ( ! isset( $_REQUEST['action'] ) || 'wptelegram_login' !== $_REQUEST['action'] ) {
+        // Only intercept during Telegram login callback (AJAX or REST API).
+        if ( ! kab_is_telegram_callback() ) {
             return $location;
         }
 
@@ -304,17 +287,25 @@ class KAB_Login_Customizer {
      * @return string|false Moodle URL or false.
      */
     private static function get_moodle_redirect_url() {
-        // Check request parameter first.
+        // 1. Check request parameter first.
         // phpcs:ignore WordPress.Security.NonceVerification
         $moodle_url = isset( $_REQUEST['moodle_redirect_to'] )
             ? esc_url_raw( wp_unslash( $_REQUEST['moodle_redirect_to'] ) )
             : '';
 
-        // Fallback: check the cookie set by handle_telegram_login_page().
+        // 2. Fallback: check the cookie set by handle_telegram_login_page().
         if ( empty( $moodle_url ) && ! empty( $_COOKIE['kab_moodle_redirect'] ) ) {
             $moodle_url = esc_url_raw( wp_unslash( $_COOKIE['kab_moodle_redirect'] ) );
-            // Clear the cookie.
             setcookie( 'kab_moodle_redirect', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+        }
+
+        // 3. Fallback: check the transient (cookie may not have survived the redirect).
+        if ( empty( $moodle_url ) ) {
+            $transient_key = 'kab_moodle_redir_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
+            $moodle_url    = get_transient( $transient_key );
+            if ( $moodle_url ) {
+                delete_transient( $transient_key );
+            }
         }
 
         if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {

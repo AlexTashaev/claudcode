@@ -119,18 +119,19 @@ class KAB_Telegram_Widget {
             $atts
         );
 
-        $html  = '<div class="kab-telegram-login-wrapper">';
-        $html .= '<p>' . esc_html( $atts['message'] ) . '</p>';
-        $html .= wptelegram_login(
+        ob_start();
+        echo '<div class="kab-telegram-login-wrapper">';
+        echo '<p>' . esc_html( $atts['message'] ) . '</p>';
+        wptelegram_login(
             array(
                 'show_user_photo' => (bool) $atts['show_user_photo'],
                 'button_style'    => $atts['button_style'],
                 'show_if_user_is' => $atts['show_if_user_is'],
                 'corner_radius'   => (int) $atts['corner_radius'],
-            ),
-            false
+            )
         );
-        $html .= '</div>';
+        echo '</div>';
+        $html = ob_get_clean();
 
         return $html;
     }

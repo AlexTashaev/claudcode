@@ -71,12 +71,14 @@ wp-content/plugins/kab-telegram-bridge/
 2. Выберите файл `moodle-telegram.zip`
 3. Нажмите **Install plugin from the ZIP file**
 
-Или вручную: распакуйте `moodle-telegram.zip` в `moodle/auth/`
+Или вручную: распакуйте содержимое `moodle-telegram.zip` в `moodle/auth/`
+
+> **Важно:** имя директории **должно** быть `telegram_wp` (совпадает с компонентом `auth_telegram_wp`). Если при распаковке создаётся лишний уровень вложенности, переместите содержимое вручную.
 
 Структура:
 
 ```
-moodle/auth/moodle-telegram/
+moodle/auth/telegram_wp/
 ├── auth.php
 ├── version.php
 ├── settings.php

@@ -47,9 +47,8 @@ class KAB_Moodle_Linker {
                 return;
             }
 
-            // phpcs:ignore WordPress.Security.NonceVerification
-            if ( ! isset( $_REQUEST['action'] ) || 'wptelegram_login' !== $_REQUEST['action'] ) {
-                kab_log( 'check_moodle_link_on_login: Not a Telegram login action, skipping.' );
+            if ( ! kab_is_telegram_callback() ) {
+                kab_log( 'check_moodle_link_on_login: Not a Telegram login callback, skipping.' );
                 return;
             }
 
@@ -116,18 +115,38 @@ class KAB_Moodle_Linker {
         }
 
         try {
-            kab_log( 'link_user_to_moodle: Calling edwiser_bridge_instance()...' );
+            kab_log( 'link_user_to_moodle: Attempting to link WP user ' . $user->ID );
             $eb = edwiser_bridge_instance();
+
+            // Edwiser Bridge stores user_manager in the plugin instance.
+            $manager = null;
             if ( $eb && method_exists( $eb, 'user_manager' ) ) {
                 $manager = $eb->user_manager();
-                if ( $manager && method_exists( $manager, 'link_moodle_user' ) ) {
-                    $manager->link_moodle_user( $user );
-                    kab_log( 'link_user_to_moodle: Successfully linked WP user ' . $user->ID );
-                } else {
-                    kab_log( 'link_user_to_moodle: link_moodle_user method not found.' );
+            }
+
+            if ( ! $manager ) {
+                // Fallback: try the global class directly (EB Pro).
+                if ( class_exists( 'Eb_User_Manager' ) ) {
+                    $manager = new Eb_User_Manager( 'edwiser-bridge', KAB_TELEGRAM_BRIDGE_VER );
                 }
+            }
+
+            if ( ! $manager ) {
+                kab_log( 'link_user_to_moodle: No user manager available.' );
+                return;
+            }
+
+            // EB's user manager creates/links users via create_moodle_user().
+            if ( method_exists( $manager, 'create_moodle_user' ) ) {
+                $result = $manager->create_moodle_user( $user );
+                kab_log( 'link_user_to_moodle: create_moodle_user result=' . wp_json_encode( $result ) );
+            } elseif ( method_exists( $manager, 'link_moodle_user' ) ) {
+                $manager->link_moodle_user( $user );
+                kab_log( 'link_user_to_moodle: link_moodle_user called for user ' . $user->ID );
             } else {
-                kab_log( 'link_user_to_moodle: user_manager method not found.' );
+                // Log available methods for debugging.
+                $methods = get_class_methods( $manager );
+                kab_log( 'link_user_to_moodle: No known link method. Available: ' . implode( ', ', $methods ) );
             }
         } catch ( \Throwable $e ) {
             kab_log( 'link_user_to_moodle ERROR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
