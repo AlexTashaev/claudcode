@@ -26,6 +26,10 @@ class KAB_Login_Customizer {
 
         // Also try the plugin-specific filter (may exist in other versions).
         add_filter( 'wptelegram_login_user_redirect_to', array( __CLASS__, 'custom_redirect_after_login' ), 10, 2 );
+
+        // Diagnostic: fires after EB SSO (priority 10) to detect if it redirected.
+        // If this code runs, EB SSO did NOT call wp_redirect + exit.
+        add_action( 'wp_login', array( __CLASS__, 'diagnose_after_eb_sso' ), 15, 2 );
     }
 
     /**
@@ -38,6 +42,12 @@ class KAB_Login_Customizer {
         kab_log( 'handle_telegram_login_page called. GET=' . wp_json_encode( $_GET ) );
         // phpcs:ignore WordPress.Security.NonceVerification
         if ( empty( $_GET['telegram_login'] ) ) {
+            // If this is an EB SSO verification request, log the auth state.
+            // phpcs:ignore WordPress.Security.NonceVerification
+            if ( isset( $_GET['wdmaction'] ) && 'login' === $_GET['wdmaction'] ) {
+                kab_log( 'EB SSO verification request detected. is_user_logged_in='
+                    . ( is_user_logged_in() ? 'YES (user_id=' . get_current_user_id() . ')' : 'NO' ) );
+            }
             kab_log( 'handle_telegram_login_page: No telegram_login param, skipping.' );
             return;
         }
@@ -179,6 +189,17 @@ class KAB_Login_Customizer {
             }
 
             if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
+                // Try to let EB SSO generate a proper SSO redirect URL.
+                // EB SSO may hook into login_redirect filter.
+                $user_obj = ( $user instanceof WP_User ) ? $user : wp_get_current_user();
+                $sso_url  = apply_filters( 'login_redirect', $moodle_url, $moodle_url, $user_obj );
+
+                if ( $sso_url && $sso_url !== $moodle_url ) {
+                    kab_log( 'custom_redirect_after_login: EB SSO via login_redirect: ' . $sso_url );
+                    return $sso_url;
+                }
+
+                kab_log( 'custom_redirect_after_login: Direct Moodle redirect: ' . $moodle_url );
                 return $moodle_url;
             }
 
@@ -195,6 +216,47 @@ class KAB_Login_Customizer {
         } catch ( \Throwable $e ) {
             error_log( 'KAB Telegram Bridge: Redirect filter failed — ' . $e->getMessage() );
             return $redirect_to;
+        }
+    }
+
+    /**
+     * Diagnostic: runs on wp_login at priority 15, AFTER Edwiser Bridge SSO
+     * (priority 10). If this code executes, EB SSO did NOT call wp_redirect + exit.
+     *
+     * @param string  $user_login Username.
+     * @param WP_User $user       User object.
+     */
+    public static function diagnose_after_eb_sso( $user_login, $user ) {
+        // phpcs:ignore WordPress.Security.NonceVerification
+        if ( ! isset( $_REQUEST['action'] ) || 'wptelegram_login' !== $_REQUEST['action'] ) {
+            return;
+        }
+
+        kab_log( 'diagnose_after_eb_sso: EB SSO did NOT redirect (still running at priority 15).' );
+        kab_log( 'diagnose_after_eb_sso: user=' . $user_login . ', user_id=' . ( $user instanceof WP_User ? $user->ID : 'unknown' ) );
+
+        // Log EB SSO availability.
+        $eb_available  = function_exists( 'edwiser_bridge_instance' ) ? 'yes' : 'no';
+        $eb_connection = get_option( 'eb_connection' );
+        kab_log( 'diagnose_after_eb_sso: edwiser_bridge_instance=' . $eb_available );
+        kab_log( 'diagnose_after_eb_sso: eb_connection=' . wp_json_encode( $eb_connection ) );
+
+        // Check what EB SSO options are stored.
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $sso_options = $wpdb->get_results(
+            "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE '%sso%' OR option_name LIKE '%eb_general%' LIMIT 20",
+            ARRAY_A
+        );
+        kab_log( 'diagnose_after_eb_sso: SSO-related options=' . wp_json_encode( $sso_options ) );
+
+        // Check if login_redirect filter returns something different (EB SSO may use it).
+        $test_url = home_url( '/' );
+        $filtered = apply_filters( 'login_redirect', $test_url, $test_url, $user );
+        if ( $filtered !== $test_url ) {
+            kab_log( 'diagnose_after_eb_sso: login_redirect filter returned: ' . $filtered );
+        } else {
+            kab_log( 'diagnose_after_eb_sso: login_redirect filter did NOT modify URL.' );
         }
     }
 
