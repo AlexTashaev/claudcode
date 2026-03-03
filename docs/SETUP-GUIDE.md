@@ -44,15 +44,15 @@
 ## Шаг 3: Установка WordPress-плагина
 
 1. В админке WordPress: **Плагины → Добавить → Загрузить плагин**
-2. Выберите файл `wp-telegram.zip`
+2. Выберите файл `kab-telegram-bridge.zip`
 3. Нажмите **Установить** → **Активировать**
 
-Или вручную: распакуйте `wp-telegram.zip` в `wp-content/plugins/`
+Или вручную: распакуйте `kab-telegram-bridge.zip` в `wp-content/plugins/`
 
 Структура должна быть:
 
 ```
-wp-content/plugins/wp-telegram/
+wp-content/plugins/kab-telegram-bridge/
 ├── kab-telegram-bridge.php
 └── kab-telegram-bridge/
     ├── class-kab-telegram-guard.php
