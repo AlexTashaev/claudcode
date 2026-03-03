@@ -214,14 +214,26 @@ class KAB_Login_Customizer {
             return $location;
         }
 
+        kab_log( 'intercept_telegram_login_redirect: Original location: ' . $location );
+
         $moodle_url = self::get_moodle_redirect_url();
-        if ( $moodle_url ) {
-            kab_log( 'intercept_telegram_login_redirect: Redirecting to Moodle: ' . $moodle_url );
-            return $moodle_url;
+        if ( ! $moodle_url ) {
+            kab_log( 'intercept_telegram_login_redirect: No Moodle URL found, keeping original.' );
+            return $location;
         }
 
-        kab_log( 'intercept_telegram_login_redirect: No Moodle URL found, keeping: ' . $location );
-        return $location;
+        // If Edwiser Bridge SSO is redirecting through its endpoint,
+        // preserve the SSO flow and append our Moodle URL as the final
+        // destination so the user ends up on the right page after SSO.
+        if ( false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
+            $modified = remove_query_arg( array( 'wantsurl', 'redirect_to' ), $location );
+            $modified = add_query_arg( 'wantsurl', rawurlencode( $moodle_url ), $modified );
+            kab_log( 'intercept_telegram_login_redirect: EB SSO detected, modified: ' . $modified );
+            return $modified;
+        }
+
+        kab_log( 'intercept_telegram_login_redirect: Redirecting to Moodle: ' . $moodle_url );
+        return $moodle_url;
     }
 
     /**

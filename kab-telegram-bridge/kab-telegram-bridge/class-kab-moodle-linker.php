@@ -73,12 +73,18 @@ class KAB_Moodle_Linker {
      */
     public static function ensure_moodle_link( $user_login_or_user, $user = null ) {
         try {
-            // Handle single-argument call: action passes only WP_User.
-            if ( $user_login_or_user instanceof WP_User && null === $user ) {
-                $user = $user_login_or_user;
+            // Handle single-argument call: action may pass WP_User, numeric ID, or string login.
+            if ( null === $user ) {
+                if ( $user_login_or_user instanceof WP_User ) {
+                    $user = $user_login_or_user;
+                } elseif ( is_numeric( $user_login_or_user ) ) {
+                    $user = get_userdata( (int) $user_login_or_user );
+                } elseif ( is_string( $user_login_or_user ) ) {
+                    $user = get_user_by( 'login', $user_login_or_user );
+                }
             }
 
-            kab_log( 'ensure_moodle_link called for user ID: ' . ( $user instanceof WP_User ? $user->ID : 'unknown' ) );
+            kab_log( 'ensure_moodle_link called for user ID: ' . ( $user instanceof WP_User ? $user->ID : 'unknown (' . gettype( $user_login_or_user ) . ': ' . wp_json_encode( $user_login_or_user ) . ')' ) );
 
             if ( ! $user instanceof WP_User ) {
                 kab_log( 'ensure_moodle_link: No valid WP_User, skipping.' );
