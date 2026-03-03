@@ -46,6 +46,19 @@ register_shutdown_function( function () {
     }
 } );
 
+// Early callback detection — catches ALL Telegram login callbacks before WP Telegram Login processes them.
+add_action( 'init', function () {
+    // phpcs:ignore WordPress.Security.NonceVerification
+    if ( isset( $_REQUEST['action'] ) && 'wptelegram_login' === $_REQUEST['action'] ) {
+        kab_log( '>>> TELEGRAM CALLBACK DETECTED on init. GET=' . wp_json_encode( $_GET ) );
+        kab_log( '>>> REQUEST_URI=' . ( isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown' ) );
+    }
+    // Also detect REST API callback (newer WP Telegram Login versions).
+    if ( isset( $_SERVER['REQUEST_URI'] ) && false !== strpos( $_SERVER['REQUEST_URI'], 'wptelegram-login' ) ) {
+        kab_log( '>>> TELEGRAM REST CALLBACK DETECTED. URI=' . $_SERVER['REQUEST_URI'] );
+    }
+}, 1 );
+
 add_action( 'plugins_loaded', function () {
     kab_log( 'plugins_loaded fired. WPTELEGRAM_LOGIN_VER=' . ( defined( 'WPTELEGRAM_LOGIN_VER' ) ? WPTELEGRAM_LOGIN_VER : 'NOT DEFINED' ) );
 
