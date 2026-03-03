@@ -29,10 +29,13 @@ class KAB_Login_Customizer {
      * of whether wp-login.php is accessible (security plugins may hide it).
      */
     public static function handle_telegram_login_page() {
+        kab_log( 'handle_telegram_login_page called. GET=' . wp_json_encode( $_GET ) );
         // phpcs:ignore WordPress.Security.NonceVerification
         if ( empty( $_GET['telegram_login'] ) ) {
+            kab_log( 'handle_telegram_login_page: No telegram_login param, skipping.' );
             return;
         }
+        kab_log( 'handle_telegram_login_page: Processing telegram_login page.' );
 
         // phpcs:ignore WordPress.Security.NonceVerification
         $moodle_url = isset( $_GET['moodle_redirect_to'] )
@@ -155,6 +158,7 @@ class KAB_Login_Customizer {
      */
     public static function custom_redirect_after_login( $redirect_to, $user = null ) {
         try {
+            kab_log( 'custom_redirect_after_login called. redirect_to=' . $redirect_to );
             // If user came from Moodle, send them back.
             // phpcs:ignore WordPress.Security.NonceVerification
             $moodle_url = isset( $_REQUEST['moodle_redirect_to'] )
