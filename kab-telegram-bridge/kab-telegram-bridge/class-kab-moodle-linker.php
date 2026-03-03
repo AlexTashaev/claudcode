@@ -16,7 +16,8 @@ class KAB_Moodle_Linker {
         add_action( 'wp_login', array( __CLASS__, 'check_moodle_link_on_login' ), 5, 2 );
 
         // Also hook the plugin-specific action as a safety net.
-        add_action( 'wptelegram_login_after_user_login', array( __CLASS__, 'ensure_moodle_link' ), 10, 2 );
+        // This action passes only 1 arg (WP_User), so we accept 1.
+        add_action( 'wptelegram_login_after_user_login', array( __CLASS__, 'ensure_moodle_link' ), 10, 1 );
     }
 
     /**
@@ -63,14 +64,24 @@ class KAB_Moodle_Linker {
      * Verify the user has a moodle_user_id meta entry. If not, attempt
      * to create the link via Edwiser Bridge.
      *
-     * @param string  $user_login Username.
-     * @param WP_User $user       User object.
+     * Called from two contexts:
+     * - wp_login action (2 args): $user_login_or_user = string, $user = WP_User
+     * - wptelegram_login_after_user_login (1 arg): $user_login_or_user = WP_User
+     *
+     * @param string|WP_User $user_login_or_user Username string or WP_User object.
+     * @param WP_User|null   $user               User object (when called with 2 args).
      */
-    public static function ensure_moodle_link( $user_login, $user ) {
+    public static function ensure_moodle_link( $user_login_or_user, $user = null ) {
         try {
-            kab_log( 'ensure_moodle_link called for: ' . $user_login );
+            // Handle single-argument call: action passes only WP_User.
+            if ( $user_login_or_user instanceof WP_User && null === $user ) {
+                $user = $user_login_or_user;
+            }
+
+            kab_log( 'ensure_moodle_link called for user ID: ' . ( $user instanceof WP_User ? $user->ID : 'unknown' ) );
 
             if ( ! $user instanceof WP_User ) {
+                kab_log( 'ensure_moodle_link: No valid WP_User, skipping.' );
                 return;
             }
 
