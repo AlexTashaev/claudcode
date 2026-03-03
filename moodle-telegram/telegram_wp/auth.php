@@ -80,17 +80,21 @@ class auth_plugin_telegram_wp extends auth_plugin_base {
     }
 
     /**
-     * Get the WordPress login URL from plugin settings.
+     * Get the WordPress site URL from plugin settings.
      *
-     * @return string WordPress login URL or empty string.
+     * The ?telegram_login=1 parameter is appended by loginpage_idp_list().
+     * The WordPress plugin (KAB Telegram Bridge) intercepts this parameter
+     * and renders a standalone Telegram login page — no wp-login.php needed.
+     *
+     * @return string WordPress site URL or empty string.
      */
     private function get_wp_login_url() {
         if ( ! empty( $this->config->wp_login_url ) ) {
-            return $this->config->wp_login_url;
+            return rtrim( $this->config->wp_login_url, '/' );
         }
 
         // Default fallback.
-        return 'https://kabacademy.com/wp-login.php';
+        return 'https://kabacademy.com';
     }
 
     /**

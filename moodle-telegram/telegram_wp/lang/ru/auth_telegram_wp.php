@@ -10,7 +10,7 @@
 $string['pluginname']      = 'Telegram через WordPress';
 $string['auth_telegram_wpdescription'] = 'Позволяет пользователям входить через Telegram с помощью сайта на WordPress. Кнопка на странице входа Moodle перенаправляет на WordPress для авторизации через Telegram, после чего Edwiser Bridge SSO создаёт сессию в Moodle.';
 $string['login_button']    = 'Войти через Telegram';
-$string['wp_login_url']    = 'URL входа WordPress';
-$string['wp_login_url_desc'] = 'Полный URL страницы входа WordPress (например, https://kabacademy.com/wp-login.php).';
+$string['wp_login_url']    = 'URL сайта WordPress';
+$string['wp_login_url_desc'] = 'URL сайта WordPress (например, https://kabacademy.com). Плагин автоматически добавит ?telegram_login=1.';
 $string['button_text']     = 'Текст кнопки';
 $string['button_text_desc'] = 'Текст, отображаемый на кнопке входа через Telegram на странице логина Moodle.';

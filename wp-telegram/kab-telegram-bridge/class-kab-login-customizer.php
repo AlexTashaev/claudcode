@@ -17,6 +17,107 @@ class KAB_Login_Customizer {
 
         // Persist the moodle_redirect_to param through the login form.
         add_action( 'login_form', array( __CLASS__, 'persist_moodle_redirect' ) );
+
+        // Custom Telegram login page — works even when wp-login.php is hidden.
+        add_action( 'template_redirect', array( __CLASS__, 'handle_telegram_login_page' ) );
+    }
+
+    /**
+     * Handle requests with ?telegram_login=1 on the front-end.
+     *
+     * This renders a standalone Telegram login page that works regardless
+     * of whether wp-login.php is accessible (security plugins may hide it).
+     */
+    public static function handle_telegram_login_page() {
+        // phpcs:ignore WordPress.Security.NonceVerification
+        if ( empty( $_GET['telegram_login'] ) ) {
+            return;
+        }
+
+        // phpcs:ignore WordPress.Security.NonceVerification
+        $moodle_url = isset( $_GET['moodle_redirect_to'] )
+            ? esc_url_raw( wp_unslash( $_GET['moodle_redirect_to'] ) )
+            : '';
+
+        // Store moodle_redirect_to in a cookie so it survives the Telegram auth callback.
+        if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
+            setcookie( 'kab_moodle_redirect', $moodle_url, time() + 600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+        }
+
+        // If already logged in, redirect immediately.
+        if ( is_user_logged_in() ) {
+            if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
+                wp_redirect( $moodle_url );
+                exit;
+            }
+
+            $eb_page_id = get_option( 'eb_useraccount_page_id' );
+            if ( $eb_page_id ) {
+                $account_url = get_permalink( $eb_page_id );
+                if ( $account_url ) {
+                    wp_redirect( $account_url );
+                    exit;
+                }
+            }
+
+            wp_redirect( home_url() );
+            exit;
+        }
+
+        // Render standalone Telegram login page.
+        self::render_telegram_login_page();
+        exit;
+    }
+
+    /**
+     * Render a clean standalone page with the Telegram login widget.
+     */
+    private static function render_telegram_login_page() {
+        $site_name = get_bloginfo( 'name' );
+        $site_icon = get_site_icon_url( 64 );
+        ?>
+        <!DOCTYPE html>
+        <html <?php language_attributes(); ?>>
+        <head>
+            <meta charset="<?php bloginfo( 'charset' ); ?>">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title><?php echo esc_html( $site_name ); ?> — Telegram Login</title>
+            <?php wp_head(); ?>
+            <style>
+                body { background: #f0f0f1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+                .kab-telegram-login-box { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.13); padding: 40px; max-width: 400px; width: 90%; text-align: center; }
+                .kab-telegram-login-box h1 { font-size: 20px; margin: 0 0 8px; }
+                .kab-telegram-login-box p { color: #72777c; margin: 0 0 24px; font-size: 14px; }
+                .kab-telegram-login-box .site-logo { margin-bottom: 16px; }
+                .kab-telegram-login-box .site-logo img { width: 64px; height: 64px; border-radius: 8px; }
+            </style>
+        </head>
+        <body>
+            <div class="kab-telegram-login-box">
+                <?php if ( $site_icon ) : ?>
+                    <div class="site-logo"><img src="<?php echo esc_url( $site_icon ); ?>" alt=""></div>
+                <?php endif; ?>
+                <h1><?php echo esc_html( $site_name ); ?></h1>
+                <p><?php esc_html_e( 'Log in with your Telegram account' ); ?></p>
+                <?php
+                if ( function_exists( 'wptelegram_login' ) ) {
+                    wptelegram_login(
+                        array(
+                            'button_style'    => 'large',
+                            'show_user_photo' => false,
+                            'corner_radius'   => 15,
+                            'show_if_user_is' => 'logged_out',
+                        )
+                    );
+                } else {
+                    echo '<p style="color:#d63638;">' . esc_html__( 'Telegram Login plugin is not active.' ) . '</p>';
+                }
+                ?>
+            </div>
+            <?php wp_footer(); ?>
+        </body>
+        </html>
+        <?php
     }
 
     /**
@@ -58,6 +159,13 @@ class KAB_Login_Customizer {
         $moodle_url = isset( $_REQUEST['moodle_redirect_to'] )
             ? esc_url_raw( wp_unslash( $_REQUEST['moodle_redirect_to'] ) )
             : '';
+
+        // Fallback: check the cookie set by handle_telegram_login_page().
+        if ( empty( $moodle_url ) && ! empty( $_COOKIE['kab_moodle_redirect'] ) ) {
+            $moodle_url = esc_url_raw( wp_unslash( $_COOKIE['kab_moodle_redirect'] ) );
+            // Clear the cookie.
+            setcookie( 'kab_moodle_redirect', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+        }
 
         if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
             return $moodle_url;

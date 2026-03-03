@@ -16,7 +16,7 @@ if ( $ADMIN->fulltree ) {
             'auth_telegram_wp/wp_login_url',
             get_string( 'wp_login_url', 'auth_telegram_wp' ),
             get_string( 'wp_login_url_desc', 'auth_telegram_wp' ),
-            'https://kabacademy.com/wp-login.php',
+            'https://kabacademy.com',
             PARAM_URL
         )
     );

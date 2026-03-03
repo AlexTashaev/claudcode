@@ -91,7 +91,7 @@ moodle/auth/moodle-telegram/
 3. Перейдите в **Site administration → Plugins → Authentication → Manage authentication**
 4. Включите **Telegram via WordPress** (значок глаза)
 5. Нажмите **Settings** рядом с плагином:
-   - **WordPress login URL:** `https://kabacademy.com/wp-login.php`
+   - **WordPress site URL:** `https://kabacademy.com` (без `/wp-login.php` — плагин сам добавит `?telegram_login=1`)
    - **Button text:** `Войти через Telegram` (или оставьте по умолчанию)
 6. Сохраните
 
