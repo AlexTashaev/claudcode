@@ -11,7 +11,6 @@ class KAB_Login_Customizer {
 
     public static function init() {
         add_action( 'login_enqueue_scripts', array( __CLASS__, 'login_page_styles' ) );
-        add_filter( 'wptelegram_login_user_redirect_to', array( __CLASS__, 'custom_redirect_after_login' ), 10, 2 );
         add_action( 'wp_ajax_kab_unlink_telegram', array( __CLASS__, 'ajax_unlink_telegram' ) );
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_profile_scripts' ) );
 
@@ -20,6 +19,13 @@ class KAB_Login_Customizer {
 
         // Custom Telegram login page — works even when wp-login.php is hidden.
         add_action( 'template_redirect', array( __CLASS__, 'handle_telegram_login_page' ) );
+
+        // Intercept ANY redirect during Telegram login to redirect to Moodle.
+        // This works regardless of WP Telegram Login plugin version.
+        add_filter( 'wp_redirect', array( __CLASS__, 'intercept_telegram_login_redirect' ), 999 );
+
+        // Also try the plugin-specific filter (may exist in other versions).
+        add_filter( 'wptelegram_login_user_redirect_to', array( __CLASS__, 'custom_redirect_after_login' ), 10, 2 );
     }
 
     /**
@@ -190,6 +196,58 @@ class KAB_Login_Customizer {
             error_log( 'KAB Telegram Bridge: Redirect filter failed — ' . $e->getMessage() );
             return $redirect_to;
         }
+    }
+
+    /**
+     * Intercept wp_redirect during Telegram login callback to redirect to Moodle.
+     *
+     * This fires for ALL wp_redirect calls, so we only modify the redirect
+     * when we detect a Telegram login action AND have a stored Moodle URL.
+     *
+     * @param string $location The redirect URL.
+     * @return string Modified redirect URL.
+     */
+    public static function intercept_telegram_login_redirect( $location ) {
+        // Only intercept during Telegram login callback.
+        // phpcs:ignore WordPress.Security.NonceVerification
+        if ( ! isset( $_REQUEST['action'] ) || 'wptelegram_login' !== $_REQUEST['action'] ) {
+            return $location;
+        }
+
+        $moodle_url = self::get_moodle_redirect_url();
+        if ( $moodle_url ) {
+            kab_log( 'intercept_telegram_login_redirect: Redirecting to Moodle: ' . $moodle_url );
+            return $moodle_url;
+        }
+
+        kab_log( 'intercept_telegram_login_redirect: No Moodle URL found, keeping: ' . $location );
+        return $location;
+    }
+
+    /**
+     * Get the Moodle redirect URL from cookie or request.
+     *
+     * @return string|false Moodle URL or false.
+     */
+    private static function get_moodle_redirect_url() {
+        // Check request parameter first.
+        // phpcs:ignore WordPress.Security.NonceVerification
+        $moodle_url = isset( $_REQUEST['moodle_redirect_to'] )
+            ? esc_url_raw( wp_unslash( $_REQUEST['moodle_redirect_to'] ) )
+            : '';
+
+        // Fallback: check the cookie set by handle_telegram_login_page().
+        if ( empty( $moodle_url ) && ! empty( $_COOKIE['kab_moodle_redirect'] ) ) {
+            $moodle_url = esc_url_raw( wp_unslash( $_COOKIE['kab_moodle_redirect'] ) );
+            // Clear the cookie.
+            setcookie( 'kab_moodle_redirect', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+        }
+
+        if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
+            return $moodle_url;
+        }
+
+        return false;
     }
 
     /**
