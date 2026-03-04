@@ -380,10 +380,12 @@ class KAB_Login_Customizer {
         // 1. Moodle redirect takes priority (user came from Moodle).
         if ( $moodle_url ) {
             if ( false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
-                $modified = remove_query_arg( array( 'wantsurl', 'redirect_to' ), $location );
-                $modified = add_query_arg( 'wantsurl', rawurlencode( $moodle_url ), $modified );
-                kab_log( 'intercept_tg_redirect: EB SSO + Moodle wantsurl: ' . $modified );
-                return $modified;
+                // EB SSO's login.php ignores wantsurl, so we use an intermediate page:
+                // hidden iframe establishes the Moodle session (SSO), then JS redirects
+                // the main window directly to the target Moodle page.
+                kab_log( 'intercept_tg_redirect: EB SSO detected, rendering intermediate page. SSO=' . $location . ' Target=' . $moodle_url );
+                self::render_sso_redirect_page( $location, $moodle_url );
+                exit;
             }
             kab_log( 'intercept_tg_redirect: Moodle redirect: ' . $moodle_url );
             return $moodle_url;
@@ -397,6 +399,89 @@ class KAB_Login_Customizer {
 
         kab_log( 'intercept_tg_redirect: No target URL, keeping original.' );
         return $location;
+    }
+
+    /**
+     * Render an intermediate page that establishes the Moodle session via a hidden
+     * iframe (EB SSO) and then redirects the main window to the target Moodle page.
+     *
+     * This is necessary because Moodle's EB SSO login.php always redirects to /my/
+     * (dashboard) and ignores the wantsurl parameter. By using an iframe, the SSO
+     * sets the session cookie in the background, and then our JS redirect takes the
+     * user directly to the correct page with an active session.
+     *
+     * Same-site context: kabacademy.com and edu.kabacademy.com share the same
+     * registrable domain, so session cookies set in the iframe are available to
+     * the main window navigation.
+     *
+     * @param string $sso_url    The EB SSO login URL (with login_id and veridy_code).
+     * @param string $target_url The Moodle page the user should land on.
+     */
+    private static function render_sso_redirect_page( $sso_url, $target_url ) {
+        // Clean any output buffers to ensure our HTML is sent directly.
+        while ( ob_get_level() ) {
+            ob_end_clean();
+        }
+
+        $sso_escaped    = esc_url( $sso_url );
+        $target_escaped = esc_url( $target_url );
+        $target_js      = wp_json_encode( $target_url );
+
+        ?>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Подключение к системе обучения…</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f1; color: #3c434a; }
+        .loader { text-align: center; }
+        .spinner { border: 4px solid #e0e0e0; border-top: 4px solid #2271b1; border-radius: 50%; width: 36px; height: 36px; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        p { font-size: 15px; margin: 0; }
+        .fallback { display: none; margin-top: 16px; }
+        .fallback a { color: #2271b1; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="loader">
+        <div class="spinner"></div>
+        <p>Подключение к системе обучения…</p>
+        <div class="fallback" id="fallback">
+            <p><a href="<?php echo $target_escaped; ?>">Нажмите здесь, если страница не загружается</a></p>
+        </div>
+    </div>
+    <iframe src="<?php echo $sso_escaped; ?>" style="display:none" id="sso"></iframe>
+    <script>
+    (function(){
+        var done = false;
+        var target = <?php echo $target_js; ?>;
+        function go() {
+            if (done) return;
+            done = true;
+            window.location.href = target;
+        }
+        var frame = document.getElementById('sso');
+        frame.onload = function() {
+            // SSO processed; small delay for cookie to finalize.
+            setTimeout(go, 800);
+        };
+        frame.onerror = function() {
+            go();
+        };
+        // Fallback: redirect after 6 seconds regardless.
+        setTimeout(go, 6000);
+        // Show manual link after 8 seconds if still here.
+        setTimeout(function() {
+            if (!done) document.getElementById('fallback').style.display = 'block';
+        }, 8000);
+    })();
+    </script>
+</body>
+</html>
+        <?php
+        exit;
     }
 
     /**
