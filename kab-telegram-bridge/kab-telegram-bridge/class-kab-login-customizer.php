@@ -182,13 +182,15 @@ class KAB_Login_Customizer {
      * @param WP_User $user       User object.
      */
     public static function redirect_before_eb_sso( $user_login, $user ) {
+        kab_log( 'redirect_before_eb_sso: called for user=' . $user_login . ' is_tg_cb=' . ( kab_is_telegram_callback() ? 'YES' : 'NO' ) );
+        kab_log( 'redirect_before_eb_sso: COOKIE keys=' . implode( ',', array_keys( $_COOKIE ?? array() ) ) );
+        kab_log( 'redirect_before_eb_sso: REQUEST keys=' . implode( ',', array_keys( $_REQUEST ?? array() ) ) );
+        kab_log( 'redirect_before_eb_sso: URI=' . ( $_SERVER['REQUEST_URI'] ?? 'unknown' ) );
+
         if ( ! kab_is_telegram_callback() ) {
             return;
         }
 
-        kab_log( 'redirect_before_eb_sso: Telegram login detected for user=' . $user_login );
-        kab_log( 'redirect_before_eb_sso: COOKIE keys=' . implode( ',', array_keys( $_COOKIE ?? array() ) ) );
-        kab_log( 'redirect_before_eb_sso: REQUEST keys=' . implode( ',', array_keys( $_REQUEST ?? array() ) ) );
         kab_log( 'redirect_before_eb_sso: REQUEST redirect_to=' . ( $_REQUEST['redirect_to'] ?? 'NOT SET' ) );
 
         // Moodle redirect takes priority — let EB SSO handle it with our wantsurl fix.
@@ -201,12 +203,31 @@ class KAB_Login_Customizer {
         // WordPress return URL — redirect immediately, before EB SSO.
         $return_url = self::get_return_url();
         if ( $return_url ) {
-            kab_log( 'redirect_before_eb_sso: REDIRECTING to ' . $return_url . ' (bypassing EB SSO)' );
+            kab_log( 'redirect_before_eb_sso: FOUND return URL: ' . $return_url );
+
+            // Set post-login cookie so any EB SSO redirect on the NEXT page load
+            // will also be intercepted (global wp_redirect filter checks this).
+            setcookie( 'kab_after_tg_login', $return_url, time() + 120, '/', '', is_ssl(), true );
+
+            // Remove ALL remaining wp_login hooks to prevent EB SSO from running.
+            remove_all_actions( 'wp_login' );
+
+            kab_log( 'redirect_before_eb_sso: REDIRECTING to ' . $return_url . ' (EB SSO hooks removed)' );
             wp_redirect( $return_url );
             exit;
         }
 
-        kab_log( 'redirect_before_eb_sso: No return URL found, deferring to EB SSO.' );
+        // No return URL found — set a fallback cookie with the referring page.
+        $referer = wp_get_referer();
+        if ( $referer && wp_validate_redirect( $referer, false ) ) {
+            kab_log( 'redirect_before_eb_sso: No return URL but have referer: ' . $referer );
+            setcookie( 'kab_after_tg_login', $referer, time() + 120, '/', '', is_ssl(), true );
+            remove_all_actions( 'wp_login' );
+            wp_redirect( $referer );
+            exit;
+        }
+
+        kab_log( 'redirect_before_eb_sso: No return URL AND no referer, deferring to EB SSO.' );
     }
 
     /**
@@ -310,12 +331,12 @@ class KAB_Login_Customizer {
      * @return string Modified redirect URL.
      */
     public static function intercept_telegram_login_redirect( $location ) {
+        kab_log( 'intercept_tg_redirect: location=' . $location . ' is_tg_cb=' . ( kab_is_telegram_callback() ? 'YES' : 'NO' ) );
+
         // Only intercept during Telegram login callback (AJAX or REST API).
         if ( ! kab_is_telegram_callback() ) {
             return $location;
         }
-
-        kab_log( 'intercept_telegram_login_redirect: Original location: ' . $location );
 
         $moodle_url = self::get_moodle_redirect_url();
         $return_url = self::get_return_url();
@@ -323,26 +344,22 @@ class KAB_Login_Customizer {
         // 1. Moodle redirect takes priority (user came from Moodle).
         if ( $moodle_url ) {
             if ( false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
-                // Moodle URL in wantsurl — Moodle will accept it (same domain).
                 $modified = remove_query_arg( array( 'wantsurl', 'redirect_to' ), $location );
                 $modified = add_query_arg( 'wantsurl', rawurlencode( $moodle_url ), $modified );
-                kab_log( 'intercept_telegram_login_redirect: EB SSO + Moodle wantsurl: ' . $modified );
+                kab_log( 'intercept_tg_redirect: EB SSO + Moodle wantsurl: ' . $modified );
                 return $modified;
             }
-            kab_log( 'intercept_telegram_login_redirect: Moodle redirect: ' . $moodle_url );
+            kab_log( 'intercept_tg_redirect: Moodle redirect: ' . $moodle_url );
             return $moodle_url;
         }
 
-        // 2. WordPress return URL (course page the user was viewing).
-        //    Bypass EB SSO entirely — Moodle rejects non-Moodle wantsurl.
-        //    The user will be redirected straight to the WP page.
-        //    Moodle SSO will happen on the next Moodle visit via EB's JS-based SSO.
+        // 2. WordPress return URL.
         if ( $return_url ) {
-            kab_log( 'intercept_telegram_login_redirect: Bypassing EB SSO, returning to WP page: ' . $return_url );
+            kab_log( 'intercept_tg_redirect: Returning to WP page: ' . $return_url );
             return $return_url;
         }
 
-        kab_log( 'intercept_telegram_login_redirect: No target URL found, keeping original.' );
+        kab_log( 'intercept_tg_redirect: No target URL, keeping original.' );
         return $location;
     }
 
@@ -408,7 +425,7 @@ class KAB_Login_Customizer {
         // 2. Check cookie set by KAB_Telegram_Widget::save_return_url().
         if ( empty( $url ) && ! empty( $_COOKIE['kab_return_to'] ) ) {
             $url = esc_url_raw( wp_unslash( $_COOKIE['kab_return_to'] ) );
-            setcookie( 'kab_return_to', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+            setcookie( 'kab_return_to', '', time() - 3600, '/', '', is_ssl(), true );
             kab_log( 'get_return_url: Found cookie kab_return_to: ' . $url );
         }
 

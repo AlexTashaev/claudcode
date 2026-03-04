@@ -22,23 +22,37 @@ class KAB_Telegram_Widget {
     /**
      * Save the current page URL in a cookie before Telegram login starts.
      *
-     * When a non-logged-in user views a course page (where the Telegram widget
-     * is shown), we store the URL so we can redirect them back after login.
+     * When a non-logged-in user views any singular page, we store the URL
+     * so we can redirect them back after login.
      */
     public static function save_return_url() {
-        if ( is_user_logged_in() || ! is_singular( 'eb_course' ) ) {
+        $logged_in  = is_user_logged_in();
+        $is_singular = is_singular();
+        $post_type  = get_post_type();
+
+        // Only log on singular pages to avoid noise from cron/ajax.
+        if ( $is_singular ) {
+            kab_log( 'save_return_url: logged_in=' . ( $logged_in ? 'YES' : 'NO' )
+                . ' is_singular=' . ( $is_singular ? 'YES' : 'NO' )
+                . ' post_type=' . ( $post_type ?: 'NONE' )
+                . ' URI=' . ( $_SERVER['REQUEST_URI'] ?? '' ) );
+        }
+
+        // Save for any singular page when user is not logged in.
+        if ( $logged_in || ! $is_singular ) {
             return;
         }
 
         $current_url = esc_url_raw( home_url( $_SERVER['REQUEST_URI'] ?? '/' ) );
 
-        setcookie( 'kab_return_to', $current_url, time() + 600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+        // Use path '/' to ensure cookie is available on all paths including REST API.
+        setcookie( 'kab_return_to', $current_url, time() + 600, '/', '', is_ssl(), true );
 
         // Also save as transient keyed by IP — fallback if cookie doesn't survive.
         $transient_key = 'kab_return_to_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
         set_transient( $transient_key, $current_url, 600 );
 
-        kab_log( 'save_return_url: Saved return URL: ' . $current_url );
+        kab_log( 'save_return_url: SAVED return URL: ' . $current_url );
     }
 
     /**

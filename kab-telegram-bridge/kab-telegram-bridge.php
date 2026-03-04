@@ -4,7 +4,7 @@
  * Description: Customizes WP Telegram Login integration for kabacademy.com.
  *              Enforces existing-users-only login, ensures Moodle linking via
  *              Edwiser Bridge, and provides custom widget placement.
- * Version: 1.4.0
+ * Version: 1.5.0
  * Author: KAB Academy
  */
 
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'KAB_TELEGRAM_BRIDGE_DIR', plugin_dir_path( __FILE__ ) . 'kab-telegram-bridge/' );
-define( 'KAB_TELEGRAM_BRIDGE_VER', '1.4.0' );
+define( 'KAB_TELEGRAM_BRIDGE_VER', '1.5.0' );
 
 /**
  * Write to our own log file so we can debug without WP_DEBUG.
@@ -76,24 +76,58 @@ register_shutdown_function( function () {
     }
 } );
 
-// Early callback detection — catches ALL Telegram login callbacks (AJAX and REST API).
+// Log ALL interesting URIs (telegram, edwiser, sso) so we can trace the full flow.
 add_action( 'init', function () {
+    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+    $uri_lower = strtolower( $uri );
+    if ( false !== strpos( $uri_lower, 'telegram' )
+        || false !== strpos( $uri_lower, 'edwiser' )
+        || false !== strpos( $uri_lower, 'wdm' )
+        || false !== strpos( $uri_lower, 'sso' )
+    ) {
+        kab_log( '>>> INTERESTING URI on init: ' . $uri );
+    }
     if ( kab_is_telegram_callback() ) {
-        $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
-        kab_log( '>>> TELEGRAM CALLBACK on init. URI=' . $uri );
+        kab_log( '>>> TELEGRAM CALLBACK detected on init. URI=' . $uri );
     }
 }, 1 );
 
 // Detect any login — wp_set_auth_cookie fires even when wp_login does not.
 add_action( 'set_auth_cookie', function ( $auth_cookie, $expire, $expiration, $user_id ) {
     $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown';
-    kab_log( 'set_auth_cookie fired for user_id=' . $user_id . ' | URI=' . $uri );
+    kab_log( '*** set_auth_cookie fired for user_id=' . $user_id . ' | URI=' . $uri );
 }, 10, 4 );
 
 // Detect wp_login — should fire on login but may not in REST context.
 add_action( 'wp_login', function ( $user_login ) {
     $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown';
-    kab_log( 'wp_login fired for: ' . $user_login . ' | URI=' . $uri );
+    kab_log( '*** wp_login fired for: ' . $user_login . ' | URI=' . $uri );
+}, 1 );
+
+// GLOBAL redirect interceptor: catch ANY wp_redirect to Moodle/EB SSO.
+// This catches redirects both during login AND on subsequent page loads.
+add_filter( 'wp_redirect', function ( $location ) {
+    $loc_lower = strtolower( $location );
+    // Log all redirects to Moodle/EB domains.
+    if ( false !== strpos( $loc_lower, 'edu.kabacademy' )
+        || false !== strpos( $loc_lower, 'edwiserbridge' )
+        || false !== strpos( $loc_lower, 'moodle' )
+    ) {
+        $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown';
+        kab_log( '*** WP_REDIRECT to Moodle/EB: ' . $location . ' | from URI=' . $uri );
+
+        // If we have a post-login return cookie, hijack this redirect.
+        if ( ! empty( $_COOKIE['kab_after_tg_login'] ) ) {
+            $return_url = esc_url_raw( wp_unslash( $_COOKIE['kab_after_tg_login'] ) );
+            // Clear cookie.
+            setcookie( 'kab_after_tg_login', '', time() - 3600, '/', '', is_ssl(), true );
+            if ( $return_url && wp_validate_redirect( $return_url, false ) ) {
+                kab_log( '*** HIJACKED EB redirect! Returning to: ' . $return_url );
+                return $return_url;
+            }
+        }
+    }
+    return $location;
 }, 1 );
 
 
