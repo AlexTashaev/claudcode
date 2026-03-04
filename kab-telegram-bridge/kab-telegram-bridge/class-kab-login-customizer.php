@@ -20,6 +20,9 @@ class KAB_Login_Customizer {
         // Custom Telegram login page — works even when wp-login.php is hidden.
         add_action( 'template_redirect', array( __CLASS__, 'handle_telegram_login_page' ) );
 
+        // After EB SSO returns user to WP, redirect to the Moodle target page.
+        add_action( 'template_redirect', array( __CLASS__, 'redirect_to_pending_moodle_target' ), 1 );
+
         // PRIMARY: Redirect BEFORE EB SSO gets a chance to run.
         // EB SSO hooks wp_login at priority 10. We hook at priority 8 and call
         // wp_redirect + exit, so EB SSO never executes during Telegram login.
@@ -94,6 +97,37 @@ class KAB_Login_Customizer {
 
         // Render standalone Telegram login page.
         self::render_telegram_login_page();
+        exit;
+    }
+
+    /**
+     * After EB SSO establishes the Moodle session and redirects back to WP,
+     * redirect the user to the Moodle page they originally wanted.
+     */
+    public static function redirect_to_pending_moodle_target() {
+        if ( ! is_user_logged_in() ) {
+            return;
+        }
+
+        if ( empty( $_COOKIE['kab_pending_moodle_target'] ) ) {
+            return;
+        }
+
+        $moodle_target = esc_url_raw( wp_unslash( $_COOKIE['kab_pending_moodle_target'] ) );
+        // Clear cookie immediately.
+        setcookie( 'kab_pending_moodle_target', '', time() - 3600, '/', '', is_ssl(), false );
+
+        if ( ! $moodle_target || ! self::is_allowed_moodle_url( $moodle_target ) ) {
+            return;
+        }
+
+        // Don't redirect if we're already processing a Telegram callback.
+        if ( kab_is_telegram_callback() ) {
+            return;
+        }
+
+        kab_log( 'redirect_to_pending_moodle_target: Redirecting to ' . $moodle_target );
+        wp_redirect( $moodle_target );
         exit;
     }
 
@@ -193,10 +227,12 @@ class KAB_Login_Customizer {
 
         kab_log( 'redirect_before_eb_sso: REQUEST redirect_to=' . ( $_REQUEST['redirect_to'] ?? 'NOT SET' ) );
 
-        // Moodle redirect takes priority — let EB SSO handle it with our wantsurl fix.
+        // Moodle redirect takes priority — let EB SSO establish the Moodle session.
+        // We store the target in a cookie so we can redirect AFTER SSO completes.
         $moodle_url = self::get_moodle_redirect_url();
         if ( $moodle_url ) {
-            kab_log( 'redirect_before_eb_sso: Moodle URL found, deferring to EB SSO.' );
+            kab_log( 'redirect_before_eb_sso: Moodle URL found (' . $moodle_url . '), saving target and deferring to EB SSO.' );
+            setcookie( 'kab_pending_moodle_target', $moodle_url, time() + 300, '/', '', is_ssl(), false );
             return;
         }
 
