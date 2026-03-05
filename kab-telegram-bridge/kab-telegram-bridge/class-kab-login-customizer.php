@@ -29,6 +29,10 @@ class KAB_Login_Customizer {
         // Process the link form submission (must run on init before any output).
         add_action( 'init', array( __CLASS__, 'handle_telegram_link_submit' ) );
 
+        // Intercept Telegram callback for unlinked accounts BEFORE the plugin
+        // processes it and shows its own error page.
+        add_action( 'init', array( __CLASS__, 'intercept_unlinked_telegram_callback' ), 1 );
+
         // After EB SSO returns user to WP, redirect to the Moodle target page.
         add_action( 'template_redirect', array( __CLASS__, 'redirect_to_pending_moodle_target' ), 1 );
 
@@ -435,6 +439,67 @@ class KAB_Login_Customizer {
 
         kab_log( 'intercept_tg_redirect: No target URL, keeping original.' );
         return $location;
+    }
+
+    /**
+     * Intercept Telegram login callback when the account is not linked.
+     *
+     * Runs on init at priority 1 — BEFORE the WP Telegram Login plugin
+     * processes the callback and shows its own error page. If the Telegram
+     * ID is not linked to any WP user, we redirect to our linking page.
+     */
+    public static function intercept_unlinked_telegram_callback() {
+        if ( ! kab_is_telegram_callback() ) {
+            return;
+        }
+
+        // phpcs:ignore WordPress.Security.NonceVerification
+        $tg_id = isset( $_REQUEST['id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['id'] ) ) : '';
+        if ( empty( $tg_id ) ) {
+            return;
+        }
+
+        if ( ! defined( 'WPTELEGRAM_USER_ID_META_KEY' ) ) {
+            kab_log( 'intercept_unlinked_tg: WPTELEGRAM_USER_ID_META_KEY not defined.' );
+            return;
+        }
+
+        // Check if this Telegram ID is already linked to a WP user.
+        $linked_users = get_users(
+            array(
+                'meta_key'   => WPTELEGRAM_USER_ID_META_KEY, // phpcs:ignore WordPress.DB.SlowDBQuery
+                'meta_value' => $tg_id, // phpcs:ignore WordPress.DB.SlowDBQuery
+                'number'     => 1,
+                'fields'     => 'ID',
+            )
+        );
+
+        if ( ! empty( $linked_users ) ) {
+            kab_log( 'intercept_unlinked_tg: TG ID ' . $tg_id . ' linked to user ' . $linked_users[0] . '. Letting plugin handle.' );
+            return; // User found, let the plugin handle login normally.
+        }
+
+        kab_log( 'intercept_unlinked_tg: TG ID ' . $tg_id . ' NOT linked. Redirecting to link page.' );
+
+        // Capture Telegram data from the request.
+        $tg_data = self::capture_telegram_data();
+        if ( ! $tg_data ) {
+            return;
+        }
+
+        $token = wp_generate_password( 32, false );
+        set_transient( 'kab_tg_link_' . $token, $tg_data, 600 );
+
+        // Get Moodle redirect URL (from cookie/transient set by handle_telegram_login_page).
+        $moodle_url = self::get_moodle_redirect_url();
+
+        $link_url = home_url( '/?telegram_link=1&token=' . $token );
+        if ( $moodle_url ) {
+            $link_url = add_query_arg( 'moodle_redirect_to', rawurlencode( $moodle_url ), $link_url );
+        }
+
+        wp_redirect( $link_url );
+        exit;
     }
 
     /**
