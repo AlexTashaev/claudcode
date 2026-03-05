@@ -4,7 +4,7 @@
  * Description: Customizes WP Telegram Login integration for kabacademy.com.
  *              Enforces existing-users-only login, ensures Moodle linking via
  *              Edwiser Bridge, and provides custom widget placement.
- * Version: 1.9.1
+ * Version: 2.0.0
  * Author: KAB Academy
  */
 
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'KAB_TELEGRAM_BRIDGE_DIR', plugin_dir_path( __FILE__ ) . 'kab-telegram-bridge/' );
-define( 'KAB_TELEGRAM_BRIDGE_VER', '1.9.1' );
+define( 'KAB_TELEGRAM_BRIDGE_VER', '2.0.0' );
 
 /**
  * Write to our own log file so we can debug without WP_DEBUG.
@@ -62,10 +62,9 @@ try {
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-moodle-linker.php';
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-telegram-widget.php';
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-login-customizer.php';
-    kab_log( 'All class files loaded OK.' );
 } catch ( \Throwable $e ) {
     kab_log( 'FATAL: Failed to load class files — ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
-    return; // Stop plugin completely.
+    return;
 }
 
 // Register a shutdown function to catch fatal errors that try/catch cannot.
@@ -76,55 +75,30 @@ register_shutdown_function( function () {
     }
 } );
 
-// Log ALL interesting URIs (telegram, edwiser, sso) so we can trace the full flow.
+// Log Telegram callbacks on init for debugging.
 add_action( 'init', function () {
-    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
-    $uri_lower = strtolower( $uri );
-    if ( false !== strpos( $uri_lower, 'telegram' )
-        || false !== strpos( $uri_lower, 'edwiser' )
-        || false !== strpos( $uri_lower, 'wdm' )
-        || false !== strpos( $uri_lower, 'sso' )
-    ) {
-        kab_log( '>>> INTERESTING URI on init: ' . $uri );
-    }
     if ( kab_is_telegram_callback() ) {
-        kab_log( '>>> TELEGRAM CALLBACK detected on init. URI=' . $uri );
+        $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+        kab_log( 'Telegram callback detected. URI=' . $uri );
     }
 }, 1 );
 
-// Detect any login — wp_set_auth_cookie fires even when wp_login does not.
-add_action( 'set_auth_cookie', function ( $auth_cookie, $expire, $expiration, $user_id ) {
-    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown';
-    kab_log( '*** set_auth_cookie fired for user_id=' . $user_id . ' | URI=' . $uri );
-}, 10, 4 );
-
-// Detect wp_login — should fire on login but may not in REST context.
-add_action( 'wp_login', function ( $user_login ) {
-    $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown';
-    kab_log( '*** wp_login fired for: ' . $user_login . ' | URI=' . $uri );
-}, 1 );
-
-// GLOBAL redirect interceptor: catch ANY wp_redirect to Moodle/EB SSO.
-// This catches redirects both during login AND on subsequent page loads.
+// GLOBAL redirect interceptor: if we have a post-login return cookie,
+// hijack any EB SSO redirect on the next page load.
 add_filter( 'wp_redirect', function ( $location ) {
+    if ( empty( $_COOKIE['kab_after_tg_login'] ) ) {
+        return $location;
+    }
+
     $loc_lower = strtolower( $location );
-    // Log all redirects to Moodle/EB domains.
     if ( false !== strpos( $loc_lower, 'edu.kabacademy' )
         || false !== strpos( $loc_lower, 'edwiserbridge' )
-        || false !== strpos( $loc_lower, 'moodle' )
     ) {
-        $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : 'unknown';
-        kab_log( '*** WP_REDIRECT to Moodle/EB: ' . $location . ' | from URI=' . $uri );
-
-        // If we have a post-login return cookie, hijack this redirect.
-        if ( ! empty( $_COOKIE['kab_after_tg_login'] ) ) {
-            $return_url = esc_url_raw( wp_unslash( $_COOKIE['kab_after_tg_login'] ) );
-            // Clear cookie.
-            setcookie( 'kab_after_tg_login', '', time() - 3600, '/', '', is_ssl(), true );
-            if ( $return_url && wp_validate_redirect( $return_url, false ) ) {
-                kab_log( '*** HIJACKED EB redirect! Returning to: ' . $return_url );
-                return $return_url;
-            }
+        $return_url = esc_url_raw( wp_unslash( $_COOKIE['kab_after_tg_login'] ) );
+        setcookie( 'kab_after_tg_login', '', time() - 3600, '/', '', is_ssl(), true );
+        if ( $return_url && wp_validate_redirect( $return_url, false ) ) {
+            kab_log( 'Global interceptor: hijacked EB redirect to ' . $return_url );
+            return $return_url;
         }
     }
     return $location;
@@ -132,8 +106,6 @@ add_filter( 'wp_redirect', function ( $location ) {
 
 
 add_action( 'plugins_loaded', function () {
-    kab_log( 'plugins_loaded fired. WPTELEGRAM_LOGIN_VER=' . ( defined( 'WPTELEGRAM_LOGIN_VER' ) ? WPTELEGRAM_LOGIN_VER : 'NOT DEFINED' ) );
-
     // Only initialize if WP Telegram Login is active.
     if ( ! defined( 'WPTELEGRAM_LOGIN_VER' ) ) {
         add_action( 'admin_notices', function () {
@@ -147,13 +119,9 @@ add_action( 'plugins_loaded', function () {
 
     try {
         KAB_Telegram_Guard::init();
-        kab_log( 'Guard init OK.' );
         KAB_Moodle_Linker::init();
-        kab_log( 'Moodle Linker init OK.' );
         KAB_Telegram_Widget::init();
-        kab_log( 'Widget init OK.' );
         KAB_Login_Customizer::init();
-        kab_log( 'Login Customizer init OK.' );
     } catch ( \Throwable $e ) {
         kab_log( 'INIT ERROR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
     }

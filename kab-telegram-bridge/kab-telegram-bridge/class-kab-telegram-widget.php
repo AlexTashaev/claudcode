@@ -26,20 +26,7 @@ class KAB_Telegram_Widget {
      * so we can redirect them back after login.
      */
     public static function save_return_url() {
-        $logged_in  = is_user_logged_in();
-        $is_singular = is_singular();
-        $post_type  = get_post_type();
-
-        // Only log on singular pages to avoid noise from cron/ajax.
-        if ( $is_singular ) {
-            kab_log( 'save_return_url: logged_in=' . ( $logged_in ? 'YES' : 'NO' )
-                . ' is_singular=' . ( $is_singular ? 'YES' : 'NO' )
-                . ' post_type=' . ( $post_type ?: 'NONE' )
-                . ' URI=' . ( $_SERVER['REQUEST_URI'] ?? '' ) );
-        }
-
-        // Save for any singular page when user is not logged in.
-        if ( $logged_in || ! $is_singular ) {
+        if ( is_user_logged_in() || ! is_singular() ) {
             return;
         }
 
@@ -51,8 +38,6 @@ class KAB_Telegram_Widget {
         // Also save as transient keyed by IP — fallback if cookie doesn't survive.
         $transient_key = 'kab_return_to_' . md5( $_SERVER['REMOTE_ADDR'] ?? '' );
         set_transient( $transient_key, $current_url, 600 );
-
-        kab_log( 'save_return_url: SAVED return URL: ' . $current_url );
     }
 
     /**
