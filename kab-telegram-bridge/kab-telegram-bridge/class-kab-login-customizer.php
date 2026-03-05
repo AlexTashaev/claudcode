@@ -9,6 +9,9 @@
  */
 class KAB_Login_Customizer {
 
+    /** @var bool True during the link-Telegram-to-existing-account flow. */
+    private static $is_linking_flow = false;
+
     public static function init() {
         add_action( 'login_enqueue_scripts', array( __CLASS__, 'login_page_styles' ) );
         add_action( 'wp_ajax_kab_unlink_telegram', array( __CLASS__, 'ajax_unlink_telegram' ) );
@@ -19,6 +22,12 @@ class KAB_Login_Customizer {
 
         // Custom Telegram login page — works even when wp-login.php is hidden.
         add_action( 'template_redirect', array( __CLASS__, 'handle_telegram_login_page' ) );
+
+        // Telegram account linking page — shown when Telegram is not linked.
+        add_action( 'template_redirect', array( __CLASS__, 'handle_telegram_link_page' ) );
+
+        // Process the link form submission (must run on init before any output).
+        add_action( 'init', array( __CLASS__, 'handle_telegram_link_submit' ) );
 
         // After EB SSO returns user to WP, redirect to the Moodle target page.
         add_action( 'template_redirect', array( __CLASS__, 'redirect_to_pending_moodle_target' ), 1 );
@@ -367,22 +376,41 @@ class KAB_Login_Customizer {
      * @return string Modified redirect URL.
      */
     public static function intercept_telegram_login_redirect( $location ) {
-        kab_log( 'intercept_tg_redirect: location=' . $location . ' is_tg_cb=' . ( kab_is_telegram_callback() ? 'YES' : 'NO' ) );
+        $is_tg_cb  = kab_is_telegram_callback();
+        $is_linking = self::$is_linking_flow;
 
-        // Only intercept during Telegram login callback (AJAX or REST API).
-        if ( ! kab_is_telegram_callback() ) {
+        kab_log( 'intercept_tg_redirect: location=' . $location
+            . ' is_tg_cb=' . ( $is_tg_cb ? 'YES' : 'NO' )
+            . ' is_linking=' . ( $is_linking ? 'YES' : 'NO' ) );
+
+        if ( ! $is_tg_cb && ! $is_linking ) {
             return $location;
         }
 
         $moodle_url = self::get_moodle_redirect_url();
+
+        // --- Unlinked Telegram account: redirect to linking page instead of error ---
+        if ( $is_tg_cb && false !== strpos( $location, 'wptelegram_login_error' ) ) {
+            $tg_data = self::capture_telegram_data();
+            if ( $tg_data ) {
+                $token = wp_generate_password( 32, false );
+                set_transient( 'kab_tg_link_' . $token, $tg_data, 600 );
+
+                $link_url = home_url( '/?telegram_link=1&token=' . $token );
+                if ( $moodle_url ) {
+                    $link_url = add_query_arg( 'moodle_redirect_to', rawurlencode( $moodle_url ), $link_url );
+                }
+                kab_log( 'intercept_tg_redirect: Unlinked account, redirecting to link page. TG_ID=' . $tg_data['id'] );
+                return $link_url;
+            }
+            kab_log( 'intercept_tg_redirect: Error redirect but could not capture TG data.' );
+        }
+
         $return_url = self::get_return_url();
 
         // 1. Moodle redirect takes priority (user came from Moodle).
         if ( $moodle_url ) {
             if ( false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
-                // EB SSO's login.php ignores wantsurl, so we use an intermediate page:
-                // hidden iframe establishes the Moodle session (SSO), then JS redirects
-                // the main window directly to the target Moodle page.
                 kab_log( 'intercept_tg_redirect: EB SSO detected, rendering intermediate page. SSO=' . $location . ' Target=' . $moodle_url );
                 self::render_sso_redirect_page( $location, $moodle_url );
                 exit;
@@ -391,7 +419,15 @@ class KAB_Login_Customizer {
             return $moodle_url;
         }
 
-        // 2. WordPress return URL.
+        // 2. Linking flow without Moodle URL: redirect to WP after EB SSO.
+        if ( $is_linking && false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
+            $eb_page_id = get_option( 'eb_useraccount_page_id' );
+            $redirect   = $eb_page_id ? get_permalink( $eb_page_id ) : home_url();
+            kab_log( 'intercept_tg_redirect: Linking flow (no Moodle), redirecting to WP: ' . $redirect );
+            return $redirect;
+        }
+
+        // 3. WordPress return URL.
         if ( $return_url ) {
             kab_log( 'intercept_tg_redirect: Returning to WP page: ' . $return_url );
             return $return_url;
@@ -399,6 +435,261 @@ class KAB_Login_Customizer {
 
         kab_log( 'intercept_tg_redirect: No target URL, keeping original.' );
         return $location;
+    }
+
+    /**
+     * Capture Telegram auth data from the current request.
+     *
+     * During the Telegram login callback, the auth data (id, first_name, etc.)
+     * is available as query parameters. We capture it before the error redirect.
+     *
+     * @return array|false Telegram data array or false if not available.
+     */
+    private static function capture_telegram_data() {
+        // phpcs:disable WordPress.Security.NonceVerification
+        $id = isset( $_REQUEST['id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['id'] ) ) : '';
+        if ( empty( $id ) ) {
+            kab_log( 'capture_telegram_data: No id in REQUEST. Keys=' . implode( ',', array_keys( $_REQUEST ?? array() ) ) );
+            return false;
+        }
+
+        $data = array(
+            'id'         => $id,
+            'first_name' => isset( $_REQUEST['first_name'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['first_name'] ) ) : '',
+            'last_name'  => isset( $_REQUEST['last_name'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['last_name'] ) ) : '',
+            'username'   => isset( $_REQUEST['username'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['username'] ) ) : '',
+        );
+        // phpcs:enable WordPress.Security.NonceVerification
+
+        kab_log( 'capture_telegram_data: Captured TG data: ' . wp_json_encode( $data ) );
+        return $data;
+    }
+
+    /**
+     * Handle requests with ?telegram_link=1 — show the account linking form.
+     *
+     * When a Telegram account is not linked to any WP user, we redirect here
+     * instead of showing an error on wp-login.php. The user can enter their
+     * existing WP credentials to link their Telegram account.
+     */
+    public static function handle_telegram_link_page() {
+        // phpcs:ignore WordPress.Security.NonceVerification
+        if ( empty( $_GET['telegram_link'] ) ) {
+            return;
+        }
+
+        // phpcs:ignore WordPress.Security.NonceVerification
+        $token   = isset( $_GET['token'] ) ? sanitize_text_field( $_GET['token'] ) : '';
+        $tg_data = $token ? get_transient( 'kab_tg_link_' . $token ) : false;
+
+        if ( ! $tg_data ) {
+            kab_log( 'handle_telegram_link_page: Invalid or expired token.' );
+            wp_redirect( home_url() );
+            exit;
+        }
+
+        // phpcs:ignore WordPress.Security.NonceVerification
+        $moodle_url = isset( $_GET['moodle_redirect_to'] )
+            ? esc_url_raw( wp_unslash( $_GET['moodle_redirect_to'] ) )
+            : '';
+
+        // phpcs:ignore WordPress.Security.NonceVerification
+        $error = isset( $_GET['link_error'] )
+            ? sanitize_text_field( wp_unslash( $_GET['link_error'] ) )
+            : '';
+
+        kab_log( 'handle_telegram_link_page: Rendering link page for TG user ' . $tg_data['id'] );
+        self::render_telegram_link_page( $token, $tg_data, $moodle_url, $error );
+        exit;
+    }
+
+    /**
+     * Render the Telegram account linking page.
+     *
+     * @param string $token      Transient token for the Telegram data.
+     * @param array  $tg_data    Telegram user data (id, first_name, username).
+     * @param string $moodle_url Optional Moodle redirect URL.
+     * @param string $error      Optional error message from a previous attempt.
+     */
+    private static function render_telegram_link_page( $token, $tg_data, $moodle_url, $error ) {
+        $site_name = get_bloginfo( 'name' );
+        $site_icon = get_site_icon_url( 64 );
+        $nonce     = wp_create_nonce( 'kab_link_telegram' );
+
+        $tg_display = '';
+        if ( ! empty( $tg_data['username'] ) ) {
+            $tg_display = '@' . esc_html( $tg_data['username'] );
+        } elseif ( ! empty( $tg_data['first_name'] ) ) {
+            $tg_display = esc_html( $tg_data['first_name'] );
+            if ( ! empty( $tg_data['last_name'] ) ) {
+                $tg_display .= ' ' . esc_html( $tg_data['last_name'] );
+            }
+        }
+
+        ?>
+        <!DOCTYPE html>
+        <html <?php language_attributes(); ?>>
+        <head>
+            <meta charset="<?php bloginfo( 'charset' ); ?>">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title><?php echo esc_html( $site_name ); ?> — Привязка Telegram</title>
+            <style>
+                body { background: #f0f0f1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+                .kab-link-box { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.13); padding: 32px 40px; max-width: 400px; width: 90%; }
+                .kab-link-box .site-logo { text-align: center; margin-bottom: 16px; }
+                .kab-link-box .site-logo img { width: 64px; height: 64px; border-radius: 8px; }
+                .kab-link-box h1 { font-size: 20px; margin: 0 0 8px; text-align: center; }
+                .kab-link-box .desc { color: #50575e; font-size: 14px; margin: 0 0 20px; text-align: center; line-height: 1.5; }
+                .kab-link-box .tg-name { font-weight: 600; color: #2271b1; }
+                .kab-link-box label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; color: #1d2327; }
+                .kab-link-box input[type="text"],
+                .kab-link-box input[type="password"] { width: 100%; padding: 8px 12px; border: 1px solid #8c8f94; border-radius: 4px; font-size: 14px; box-sizing: border-box; margin-bottom: 16px; }
+                .kab-link-box input:focus { border-color: #2271b1; box-shadow: 0 0 0 1px #2271b1; outline: none; }
+                .kab-link-box .submit-btn { width: 100%; padding: 10px; background: #2271b1; color: #fff; border: none; border-radius: 4px; font-size: 15px; font-weight: 600; cursor: pointer; }
+                .kab-link-box .submit-btn:hover { background: #135e96; }
+                .kab-link-box .error { background: #fcf0f1; border-left: 4px solid #d63638; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: #d63638; border-radius: 0 4px 4px 0; }
+            </style>
+        </head>
+        <body>
+            <div class="kab-link-box">
+                <?php if ( $site_icon ) : ?>
+                    <div class="site-logo"><img src="<?php echo esc_url( $site_icon ); ?>" alt=""></div>
+                <?php endif; ?>
+                <h1>Привязка Telegram</h1>
+                <p class="desc">
+                    Ваш Telegram аккаунт
+                    <?php if ( $tg_display ) : ?>
+                        (<span class="tg-name"><?php echo $tg_display; ?></span>)
+                    <?php endif; ?>
+                    не привязан ни к одному аккаунту на сайте.<br>
+                    Введите логин и пароль, чтобы привязать Telegram и войти.
+                </p>
+                <?php if ( $error ) : ?>
+                    <div class="error"><?php echo esc_html( $error ); ?></div>
+                <?php endif; ?>
+                <form method="post" action="<?php echo esc_url( home_url( '/' ) ); ?>">
+                    <input type="hidden" name="telegram_link_submit" value="1">
+                    <input type="hidden" name="token" value="<?php echo esc_attr( $token ); ?>">
+                    <input type="hidden" name="moodle_redirect_to" value="<?php echo esc_attr( $moodle_url ); ?>">
+                    <input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>">
+
+                    <label for="log">Имя пользователя или email</label>
+                    <input type="text" name="log" id="log" autocomplete="username" required>
+
+                    <label for="pwd">Пароль</label>
+                    <input type="password" name="pwd" id="pwd" autocomplete="current-password" required>
+
+                    <button type="submit" class="submit-btn">Привязать и войти</button>
+                </form>
+            </div>
+        </body>
+        </html>
+        <?php
+    }
+
+    /**
+     * Process the Telegram linking form submission.
+     *
+     * Authenticates the user, links the Telegram account, logs them in,
+     * and triggers EB SSO via do_action('wp_login').
+     */
+    public static function handle_telegram_link_submit() {
+        if ( empty( $_POST['telegram_link_submit'] ) ) {
+            return;
+        }
+
+        kab_log( 'handle_telegram_link_submit: Processing form submission.' );
+
+        $token = sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) );
+        $nonce = wp_unslash( $_POST['_wpnonce'] ?? '' );
+
+        // Verify nonce.
+        if ( ! wp_verify_nonce( $nonce, 'kab_link_telegram' ) ) {
+            kab_log( 'handle_telegram_link_submit: Nonce verification failed.' );
+            wp_redirect( home_url() );
+            exit;
+        }
+
+        // Get stored Telegram data.
+        $tg_data = get_transient( 'kab_tg_link_' . $token );
+        if ( ! $tg_data ) {
+            kab_log( 'handle_telegram_link_submit: Invalid or expired token.' );
+            self::redirect_link_error( $token, '', 'Сессия истекла. Попробуйте войти через Telegram снова.' );
+        }
+
+        $username   = sanitize_text_field( wp_unslash( $_POST['log'] ?? '' ) );
+        $password   = wp_unslash( $_POST['pwd'] ?? '' );
+        $moodle_url = esc_url_raw( wp_unslash( $_POST['moodle_redirect_to'] ?? '' ) );
+
+        // Authenticate.
+        $user = wp_authenticate( $username, $password );
+        if ( is_wp_error( $user ) ) {
+            $error_msg = $user->get_error_message();
+            $error_msg = wp_strip_all_tags( $error_msg );
+            kab_log( 'handle_telegram_link_submit: Auth failed: ' . $error_msg );
+            self::redirect_link_error( $token, $moodle_url, $error_msg );
+        }
+
+        kab_log( 'handle_telegram_link_submit: Auth OK for user ' . $user->ID . '. Linking TG ID=' . $tg_data['id'] );
+
+        // Link Telegram account.
+        if ( defined( 'WPTELEGRAM_USER_ID_META_KEY' ) ) {
+            update_user_meta( $user->ID, WPTELEGRAM_USER_ID_META_KEY, $tg_data['id'] );
+        }
+        if ( ! empty( $tg_data['username'] ) ) {
+            $uname_key = defined( 'WPTELEGRAM_USERNAME_META_KEY' )
+                ? WPTELEGRAM_USERNAME_META_KEY
+                : 'wptelegram_username';
+            update_user_meta( $user->ID, $uname_key, $tg_data['username'] );
+        }
+        if ( ! empty( $tg_data['first_name'] ) ) {
+            update_user_meta( $user->ID, 'wptelegram_first_name', $tg_data['first_name'] );
+        }
+
+        // Clean up the transient.
+        delete_transient( 'kab_tg_link_' . $token );
+
+        // Log the user in and trigger EB SSO.
+        wp_set_current_user( $user->ID );
+        wp_set_auth_cookie( $user->ID, true );
+
+        self::$is_linking_flow = true;
+        if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
+            $_REQUEST['moodle_redirect_to'] = $moodle_url;
+        }
+
+        kab_log( 'handle_telegram_link_submit: Firing wp_login to trigger EB SSO.' );
+        do_action( 'wp_login', $user->user_login, $user );
+
+        // If EB SSO didn't redirect (exit), fall back to manual redirect.
+        kab_log( 'handle_telegram_link_submit: EB SSO did not redirect. Falling back.' );
+        if ( $moodle_url && self::is_allowed_moodle_url( $moodle_url ) ) {
+            wp_redirect( $moodle_url );
+        } else {
+            $eb_page_id = get_option( 'eb_useraccount_page_id' );
+            wp_redirect( $eb_page_id ? get_permalink( $eb_page_id ) : home_url() );
+        }
+        exit;
+    }
+
+    /**
+     * Redirect back to the linking page with an error message.
+     *
+     * @param string $token      Transient token.
+     * @param string $moodle_url Moodle redirect URL.
+     * @param string $error      Error message.
+     */
+    private static function redirect_link_error( $token, $moodle_url, $error ) {
+        $args = array(
+            'telegram_link' => 1,
+            'token'         => $token,
+            'link_error'    => rawurlencode( $error ),
+        );
+        if ( $moodle_url ) {
+            $args['moodle_redirect_to'] = rawurlencode( $moodle_url );
+        }
+        wp_redirect( add_query_arg( $args, home_url( '/' ) ) );
+        exit;
     }
 
     /**
