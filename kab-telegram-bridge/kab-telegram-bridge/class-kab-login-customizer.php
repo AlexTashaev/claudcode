@@ -391,6 +391,12 @@ class KAB_Login_Customizer {
             return $location;
         }
 
+        // Don't intercept redirects to our own pages (e.g. linking page).
+        if ( false !== strpos( $location, 'telegram_link=1' ) ) {
+            kab_log( 'intercept_tg_redirect: Redirect to own linking page, passing through.' );
+            return $location;
+        }
+
         $moodle_url = self::get_moodle_redirect_url();
 
         // --- Unlinked Telegram account: redirect to linking page instead of error ---
@@ -856,6 +862,7 @@ class KAB_Login_Customizer {
         if ( empty( $moodle_url ) && ! empty( $_COOKIE['kab_moodle_redirect'] ) ) {
             $moodle_url = esc_url_raw( wp_unslash( $_COOKIE['kab_moodle_redirect'] ) );
             setcookie( 'kab_moodle_redirect', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+            unset( $_COOKIE['kab_moodle_redirect'] ); // Prevent double-read in same request.
         }
 
         // 3. Fallback: check the transient (cookie may not have survived the redirect).
@@ -903,6 +910,7 @@ class KAB_Login_Customizer {
         if ( empty( $url ) && ! empty( $_COOKIE['kab_return_to'] ) ) {
             $url = esc_url_raw( wp_unslash( $_COOKIE['kab_return_to'] ) );
             setcookie( 'kab_return_to', '', time() - 3600, '/', '', is_ssl(), true );
+            unset( $_COOKIE['kab_return_to'] ); // Prevent double-read in same request.
             kab_log( 'get_return_url: Found cookie kab_return_to: ' . $url );
         }
 
