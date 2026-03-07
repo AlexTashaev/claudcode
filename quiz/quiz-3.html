@@ -73,17 +73,6 @@
         .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(102,126,234,0.6); }
         .cta-btn svg { width: 20px; height: 20px; fill: currentColor; }
         .cta-hint { font-size: 0.9rem; color: #8888aa; margin-bottom: 28px; line-height: 1.5; }
-        .result-image-section { margin-bottom: 28px; }
-        .result-image-section canvas { display: none; }
-        .result-image-section img { max-width: 100%; border-radius: 16px; border: 1px solid rgba(102,126,234,0.2); }
-        .btn-download {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-            color: #b0b0d0; padding: 10px 20px; font-size: 0.85rem; border-radius: 50px;
-            cursor: pointer; transition: all 0.2s; margin-top: 12px;
-        }
-        .btn-download:hover { background: rgba(255,255,255,0.15); color: #fff; }
-        .btn-download svg { width: 16px; height: 16px; fill: currentColor; }
         .share-section h3 { font-size: 0.95rem; color: #8888aa; margin-bottom: 16px; font-weight: 400; }
         .share-buttons { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
         .share-btn {
@@ -132,6 +121,35 @@
             .share-btn { width: 220px; justify-content: center; }
             .breakdown-label { width: 90px; font-size: 0.8rem; }
         }
+        .profile-divider { width: 60px; height: 1px; background: rgba(102,126,234,0.3); margin: 32px auto; }
+        .profile-section { margin-bottom: 24px; }
+        .profile-section h3 { text-align: center; color: #fff; font-size: 1.15rem; margin-bottom: 20px; font-weight: 500; }
+        .soul-badge { text-align: center; margin-bottom: 20px; }
+        .soul-badge .sb-emoji { font-size: 2.5rem; }
+        .soul-badge .sb-label { font-size: 0.75rem; color: #667eea; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
+        .soul-badge .sb-title { font-size: 1.5rem; color: #fff; font-weight: 700; }
+        .path-mini { display: flex; align-items: flex-start; justify-content: center; gap: 0; margin-bottom: 24px; overflow-x: auto; padding: 8px 0; }
+        .pm-step { display: flex; flex-direction: column; align-items: center; min-width: 44px; }
+        .pm-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.1); margin-bottom: 6px; }
+        .pm-dot.done { background: #667eea; }
+        .pm-dot.current { background: #a855f7; width: 14px; height: 14px; box-shadow: 0 0 8px rgba(168,85,247,0.5); }
+        .pm-line { width: 12px; height: 2px; background: rgba(255,255,255,0.1); margin-top: 4px; flex-shrink: 0; }
+        .pm-line.done { background: #667eea; }
+        .pm-label { font-size: 0.6rem; color: #555577; white-space: nowrap; }
+        .pm-step.s-done .pm-label { color: #8888aa; }
+        .pm-step.s-current .pm-label { color: #a855f7; font-weight: 600; }
+        .quiz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+        .qg-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 8px; text-align: center; }
+        .qg-item.done { border-color: rgba(102,126,234,0.2); }
+        .qg-item.empty { opacity: 0.4; border-style: dashed; }
+        .qg-label { font-size: 0.7rem; color: #8888aa; margin-bottom: 4px; }
+        .qg-value { font-size: 0.85rem; color: #fff; font-weight: 600; }
+        .qg-item.empty .qg-value { color: #555577; }
+        .qg-link { display: block; font-size: 0.75rem; color: #667eea; text-decoration: none; margin-top: 4px; }
+        .rec-card { background: rgba(102,126,234,0.08); border: 1px solid rgba(102,126,234,0.2); border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 8px; }
+        .rec-card p { color: #b0b0d0; font-size: 0.9rem; margin-bottom: 14px; line-height: 1.5; }
+        .btn-next { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; padding: 14px 28px; font-size: 0.95rem; border-radius: 50px; cursor: pointer; text-decoration: none; box-shadow: 0 4px 16px rgba(102,126,234,0.3); transition: transform 0.2s; }
+        .btn-next:hover { transform: translateY(-2px); }
     </style>
 </head>
 <body>
@@ -188,8 +206,52 @@
 
         const QUIZ_ID = 'quiz3';
         const QUIZ_LABEL = 'Главный внутренний вопрос';
-        const NEXT_QUIZ = 'quiz-4.html';
-        const NEXT_LABEL = 'Насколько глубоко вы воспринимаете реальность';
+
+        const quizMeta = [
+            { id: 'quiz1', label: 'Этап поиска', url: 'index.html' },
+            { id: 'quiz2', label: 'Тип познания', url: 'quiz-2.html' },
+            { id: 'quiz3', label: 'Главный вопрос', url: 'quiz-3.html' },
+            { id: 'quiz4', label: 'Глубина восприятия', url: 'quiz-4.html' },
+            { id: 'quiz5', label: 'Готовность', url: 'quiz-5.html' }
+        ];
+        const soulLevels = [
+            { title: 'Спящий', emoji: '💤' }, { title: 'Наблюдатель', emoji: '👁' },
+            { title: 'Искатель', emoji: '🔍' }, { title: 'Путник', emoji: '🚶' },
+            { title: 'Исследователь', emoji: '🧭' }, { title: 'Познающий', emoji: '✨' },
+            { title: 'Проводник', emoji: '🌟' }
+        ];
+        const typeEmojisMap = ['👁', '🔍', '🧭', '✨'];
+
+        function getSoulLevel(prof) {
+            const done = quizMeta.filter(q => prof[q.id]);
+            if (!done.length) return 0;
+            const avg = done.reduce((s, q) => s + prof[q.id].dominant, 0) / done.length;
+            return Math.min(6, Math.max(1, Math.round(avg * 1.2 + (done.length / quizMeta.length) * 2.5)));
+        }
+
+        function buildProfileSection() {
+            const prof = JSON.parse(localStorage.getItem('quizProfile') || '{}');
+            const done = quizMeta.filter(q => prof[q.id]);
+            if (!done.length) return '';
+            const si = getSoulLevel(prof);
+            const soul = soulLevels[si];
+            const pathHTML = soulLevels.map((l, i) => {
+                const sc = i < si ? 's-done' : i === si ? 's-current' : 's-future';
+                const dc = i < si ? 'done' : i === si ? 'current' : '';
+                const line = i < soulLevels.length - 1 ? '<div class="pm-line' + (i < si ? ' done' : '') + '"></div>' : '';
+                return '<div class="pm-step ' + sc + '"><div class="pm-dot ' + dc + '"></div><div class="pm-label">' + l.title + '</div></div>' + line;
+            }).join('');
+            const gridHTML = quizMeta.map(q => {
+                const r = prof[q.id];
+                if (r) return '<div class="qg-item done"><div class="qg-label">' + q.label + '</div><div class="qg-value">' + typeEmojisMap[r.dominant] + ' ' + r.title + '</div></div>';
+                return '<div class="qg-item empty"><div class="qg-label">' + q.label + '</div><div class="qg-value">—</div><a class="qg-link" href="' + q.url + '">Пройти</a></div>';
+            }).join('');
+            const next = quizMeta.find(q => !prof[q.id]);
+            const recHTML = next
+                ? '<p>Пройдите тест «' + next.label + '» для углубления профиля</p><a class="btn-next" href="' + next.url + '">Следующий тест</a>'
+                : '<p>Все тесты пройдены! Следующий шаг — изучение законов жизни.</p><a class="btn-next" href="https://kabacademy.com/mak-fall-2025/step/lp-test-mir-v3/" target="_blank" rel="noopener">Начать обучение</a>';
+            return '<div class="profile-divider"></div><div class="profile-section"><h3>Ваш путь души</h3><div class="soul-badge"><div class="sb-emoji">' + soul.emoji + '</div><div class="sb-label">Уровень пути</div><div class="sb-title">' + soul.title + '</div></div><div class="path-mini">' + pathHTML + '</div><div class="quiz-grid">' + gridHTML + '</div><div class="rec-card">' + recHTML + '</div></div>';
+        }
 
         let currentQuestion = 0, answers = [];
 
@@ -269,13 +331,6 @@
                         : `<a class="cta-btn" href="${r.cta.url}" target="_blank" rel="noopener">${ctaIcons[r.cta.icon]} ${r.cta.text}</a>`}
                     <p class="cta-hint">Узнайте больше о вопросах, которые движут человеком,<br>на вводном курсе.</p>
                 </div>
-                <div class="result-image-section">
-                    <canvas id="resultCanvas" width="1080" height="1080"></canvas>
-                    <img id="resultImage" alt="Результат теста"><br>
-                    <button class="btn-download" onclick="downloadImage()">
-                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> Скачать картинку
-                    </button>
-                </div>
                 <div class="share-section">
                     <h3>Поделиться результатом</h3>
                     <div class="share-buttons">
@@ -293,77 +348,13 @@
                         </button>
                     </div>
                 </div>
-                <button class="btn-restart" onclick="restart()">Пройти ещё раз</button>
-                <div style="margin-top:24px">
-                    <a class="cta-btn" href="${NEXT_QUIZ}" style="display:inline-flex;text-decoration:none">
-                        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
-                        Следующий тест: ${NEXT_LABEL}
-                    </a>
-                    <p style="margin-top:8px"><a href="profile.html" style="color:#8888aa;font-size:0.85rem;text-decoration:underline">Мой профиль пути</a></p>
-                </div>`;
+                ${buildProfileSection()}
+                <button class="btn-restart" onclick="restart()">Пройти ещё раз</button>`;
             resultEl.dataset.shareText = shareText + '\n' + shareUrl;
             const profile = JSON.parse(localStorage.getItem('quizProfile') || '{}');
             profile[QUIZ_ID] = { label: QUIZ_LABEL, dominant: dominant.idx, title: r.title, pcts: pcts, timestamp: Date.now() };
             localStorage.setItem('quizProfile', JSON.stringify(profile));
             setTimeout(() => { document.querySelectorAll('.breakdown-bar').forEach(bar => { bar.style.width = bar.dataset.target + '%'; }); }, 100);
-            generateResultImage(r, sorted);
-        }
-
-        function generateResultImage(dominant, sorted) {
-            const canvas = document.getElementById('resultCanvas');
-            const ctx = canvas.getContext('2d');
-            const W = 1080, H = 1080;
-            const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-            bgGrad.addColorStop(0, '#0f0c29'); bgGrad.addColorStop(0.5, '#302b63'); bgGrad.addColorStop(1, '#24243e');
-            ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
-            ctx.globalAlpha = 0.06; ctx.fillStyle = '#667eea';
-            ctx.beginPath(); ctx.arc(850, 180, 200, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(200, 900, 150, 0, Math.PI * 2); ctx.fill();
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = 'rgba(26, 22, 64, 0.7)';
-            roundRect(ctx, 60, 60, W - 120, H - 120, 30); ctx.fill();
-            ctx.strokeStyle = 'rgba(102, 126, 234, 0.3)'; ctx.lineWidth = 2;
-            roundRect(ctx, 60, 60, W - 120, H - 120, 30); ctx.stroke();
-            ctx.fillStyle = 'rgba(102, 126, 234, 0.15)';
-            roundRect(ctx, (W - 380) / 2, 110, 380, 36, 18); ctx.fill();
-            ctx.fillStyle = '#667eea'; ctx.font = '600 16px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText('МОЙ ГЛАВНЫЙ ВОПРОС В ЖИЗНИ', W / 2, 134);
-            ctx.font = '80px sans-serif'; ctx.fillText(dominant.emoji, W / 2, 240);
-            ctx.fillStyle = '#667eea'; ctx.font = '600 28px "Segoe UI", sans-serif';
-            ctx.fillText(`УРОВЕНЬ: ${dominant.level}`, W / 2, 300);
-            ctx.fillStyle = '#ffffff'; ctx.font = '700 64px "Segoe UI", sans-serif';
-            ctx.fillText(dominant.title, W / 2, 385);
-            const barColors = ['#5b7db1', '#667eea', '#8b5cf6', '#a855f7'];
-            const barStartY = 470, barLeftX = 300, barWidth = 400, barHeight = 22, barGap = 60;
-            sorted.forEach((s, i) => {
-                const y = barStartY + i * barGap;
-                ctx.fillStyle = '#b0b0d0'; ctx.font = '400 24px "Segoe UI", sans-serif'; ctx.textAlign = 'right';
-                ctx.fillText(s.type.title, barLeftX - 16, y + 16);
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'; roundRect(ctx, barLeftX, y, barWidth, barHeight, 11); ctx.fill();
-                const fillW = (s.pct / 100) * barWidth;
-                if (fillW > 0) { ctx.fillStyle = barColors[s.idx]; roundRect(ctx, barLeftX, y, Math.max(fillW, 12), barHeight, 11); ctx.fill(); }
-                ctx.fillStyle = '#ffffff'; ctx.font = '700 26px "Segoe UI", sans-serif'; ctx.textAlign = 'left';
-                ctx.fillText(`${s.pct}%`, barLeftX + barWidth + 14, y + 17);
-            });
-            const bottomY = barStartY + sorted.length * barGap + 50;
-            ctx.fillStyle = '#8888aa'; ctx.font = '400 20px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText('Пройди тест и узнай свой главный вопрос', W / 2, bottomY);
-            document.getElementById('resultImage').src = canvas.toDataURL('image/png');
-        }
-
-        function roundRect(ctx, x, y, w, h, r) {
-            ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
-            ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
-            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
-            ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
-            ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
-        }
-
-        function downloadImage() {
-            const link = document.createElement('a');
-            link.download = 'мой-главный-вопрос.png';
-            link.href = document.getElementById('resultCanvas').toDataURL('image/png');
-            link.click();
         }
 
         function openVideoModal(videoId) {
