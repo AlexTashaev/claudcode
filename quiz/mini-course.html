@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мини-курс — Исследователь</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #8888aa;
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-bottom: 32px;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover {
+            color: #b0b0d0;
+        }
+
+        .back-link svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #8888aa;
+            font-size: 1rem;
+            margin-bottom: 40px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: #8888aa;
+        }
+
+        .course-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-bottom: 32px;
+            overflow: hidden;
+        }
+
+        .course-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 2px;
+            transition: width 0.6s ease;
+        }
+
+        .video-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+            transition: all 0.3s;
+        }
+
+        .video-card.active {
+            background: rgba(102, 126, 234, 0.08);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .video-card.locked {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .video-card.completed {
+            border-color: rgba(118, 75, 162, 0.4);
+        }
+
+        .video-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .video-number {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .video-card.locked .video-number {
+            background: rgba(255, 255, 255, 0.08);
+            color: #666;
+        }
+
+        .video-card.active .video-number {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+        }
+
+        .video-card.completed .video-number {
+            background: rgba(118, 75, 162, 0.3);
+            color: #b0b0d0;
+        }
+
+        .video-title {
+            font-size: 1.05rem;
+            color: #fff;
+        }
+
+        .video-card.locked .video-title {
+            color: #555;
+        }
+
+        .video-card.completed .video-title {
+            color: #b0b0d0;
+        }
+
+        .video-status {
+            font-size: 0.8rem;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .status-locked {
+            color: #555;
+        }
+
+        .status-active {
+            color: #667eea;
+        }
+
+        .status-completed {
+            color: #764ba2;
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .lock-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .lock-overlay svg {
+            width: 32px;
+            height: 32px;
+            fill: #555;
+        }
+
+        .lock-overlay span {
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        .btn-next {
+            display: none;
+            margin-top: 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            border: none;
+            padding: 12px 28px;
+            font-size: 0.95rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-next:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(102, 126, 234, 0.5);
+        }
+
+        .completion-message {
+            display: none;
+            text-align: center;
+            padding: 32px;
+            animation: fadeIn 0.6s ease;
+        }
+
+        .completion-message.visible {
+            display: block;
+        }
+
+        .completion-message h2 {
+            font-size: 1.4rem;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+
+        .completion-message p {
+            color: #b0b0d0;
+            font-size: 1rem;
+            margin-bottom: 24px;
+        }
+
+        .btn-course {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            border: none;
+            padding: 16px 36px;
+            font-size: 1.05rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            text-decoration: none;
+        }
+
+        .btn-course:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 28px rgba(102, 126, 234, 0.6);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 480px) {
+            h1 { font-size: 1.4rem; }
+            .video-card { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+            Назад к тесту
+        </a>
+
+        <h1>Мини-курс для Исследователя</h1>
+        <p class="subtitle">Посмотрите видео по порядку — каждое следующее откроется после завершения предыдущего</p>
+
+        <div class="progress-info">
+            <span id="progressLabel">Видео 1 из 6</span>
+            <span id="progressPercent">0%</span>
+        </div>
+        <div class="course-progress">
+            <div class="course-progress-fill" id="courseProgress" style="width: 0%"></div>
+        </div>
+
+        <div id="videoList"></div>
+
+        <div class="completion-message" id="completion">
+            <h2>Мини-курс пройден!</h2>
+            <p>Вы посмотрели все видео. Готовы к следующему шагу?</p>
+            <a class="btn-course" href="https://kabacademy.com/mak-fall-2025/step/lp-test-mir-v3/" target="_blank" rel="noopener">
+                Перейти к полному курсу
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const videos = [
+            { id: "d3MyJSLomhs", title: "Урок 1" },
+            { id: "bS_hhu2KHow", title: "Урок 2" },
+            { id: "swqYlv0Yrco", title: "Урок 3" },
+            { id: "7Ez-jxKfKcU", title: "Урок 4" },
+            { id: "VSwpbp9IQp4", title: "Урок 5" },
+            { id: "ZB6st_Y3z-Y", title: "Урок 6" }
+        ];
+
+        let currentVideo = 0;
+        let completedVideos = new Set();
+        let players = {};
+
+        // Load YouTube IFrame API
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+
+        function renderVideos() {
+            const list = document.getElementById('videoList');
+            list.innerHTML = videos.map((v, i) => {
+                let state = i === 0 ? 'active' : 'locked';
+                if (completedVideos.has(i)) state = 'completed';
+                if (i === currentVideo && !completedVideos.has(i)) state = 'active';
+
+                let statusText = '';
+                let statusClass = '';
+                if (state === 'locked') { statusText = '🔒'; statusClass = 'status-locked'; }
+                else if (state === 'active') { statusText = 'Смотреть'; statusClass = 'status-active'; }
+                else { statusText = '✓'; statusClass = 'status-completed'; }
+
+                let content = '';
+                if (state === 'active') {
+                    content = `
+                        <div class="video-wrapper">
+                            <div id="player-${i}"></div>
+                        </div>
+                        <button class="btn-next" id="btn-next-${i}" onclick="completeVideo(${i})">
+                            Следующее видео →
+                        </button>
+                    `;
+                } else if (state === 'locked') {
+                    content = `
+                        <div class="lock-overlay">
+                            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                            <span>Посмотрите предыдущее видео</span>
+                        </div>
+                    `;
+                } else {
+                    content = `
+                        <div class="video-wrapper">
+                            <div id="player-${i}"></div>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="video-card ${state}" id="card-${i}">
+                        <div class="video-header">
+                            <div class="video-number">${i + 1}</div>
+                            <div class="video-title">${v.title}</div>
+                            <div class="video-status ${statusClass}">${statusText}</div>
+                        </div>
+                        ${content}
+                    </div>
+                `;
+            }).join('');
+
+            updateProgress();
+        }
+
+        function onYouTubeIframeAPIReady() {
+            renderVideos();
+            createPlayers();
+        }
+
+        function createPlayers() {
+            videos.forEach((v, i) => {
+                const el = document.getElementById(`player-${i}`);
+                if (!el) return;
+                players[i] = new YT.Player(`player-${i}`, {
+                    videoId: v.id,
+                    playerVars: {
+                        rel: 0,
+                        modestbranding: 1
+                    },
+                    events: {
+                        onStateChange: (e) => onPlayerStateChange(e, i)
+                    }
+                });
+            });
+        }
+
+        function onPlayerStateChange(event, index) {
+            // Video ended
+            if (event.data === YT.PlayerState.ENDED) {
+                const btn = document.getElementById(`btn-next-${index}`);
+                if (btn) btn.style.display = 'inline-block';
+            }
+        }
+
+        function completeVideo(index) {
+            completedVideos.add(index);
+            if (index < videos.length - 1) {
+                currentVideo = index + 1;
+                renderVideos();
+                createPlayers();
+
+                // Scroll to next video
+                setTimeout(() => {
+                    const nextCard = document.getElementById(`card-${currentVideo}`);
+                    if (nextCard) nextCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            } else {
+                // All videos completed
+                renderVideos();
+                createPlayers();
+                document.getElementById('completion').classList.add('visible');
+                setTimeout(() => {
+                    document.getElementById('completion').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+        }
+
+        function updateProgress() {
+            const done = completedVideos.size;
+            const total = videos.length;
+            const pct = Math.round((done / total) * 100);
+            document.getElementById('progressLabel').textContent = `Видео ${Math.min(done + 1, total)} из ${total}`;
+            document.getElementById('progressPercent').textContent = `${pct}%`;
+            document.getElementById('courseProgress').style.width = `${pct}%`;
+        }
+    </script>
+</body>
+</html>
