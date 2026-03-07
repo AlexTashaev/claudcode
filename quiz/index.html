@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест: на каком уровне развития находится ваше сознание</title>
+    <meta property="og:title" content="Тест: на каком уровне развития находится ваше сознание">
+    <meta property="og:description" content="7 вопросов — и вы узнаете, на каком этапе внутреннего развития находитесь">
+    <meta property="og:type" content="website">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .quiz-container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        /* Intro screen */
+        .intro {
+            text-align: center;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .intro h1 {
+            font-size: 1.8rem;
+            color: #fff;
+            margin-bottom: 16px;
+            line-height: 1.3;
+        }
+
+        .intro p {
+            font-size: 1.1rem;
+            color: #b0b0d0;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            border: none;
+            padding: 16px 48px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 28px rgba(102, 126, 234, 0.6);
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-bottom: 32px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        .question-counter {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #8888aa;
+            margin-bottom: 12px;
+        }
+
+        /* Question card */
+        .question-card {
+            animation: slideIn 0.4s ease;
+        }
+
+        .question-card h2 {
+            font-size: 1.35rem;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 28px;
+            line-height: 1.4;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .option-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #e0e0e0;
+            padding: 16px 20px;
+            font-size: 1rem;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .option-btn:hover {
+            background: rgba(102, 126, 234, 0.15);
+            border-color: rgba(102, 126, 234, 0.4);
+            transform: translateX(4px);
+        }
+
+        .option-btn.selected {
+            background: rgba(102, 126, 234, 0.25);
+            border-color: #667eea;
+        }
+
+        /* Result screen */
+        .result {
+            text-align: center;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .result-level {
+            font-size: 0.9rem;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+        }
+
+        .result-title {
+            font-size: 2.2rem;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+
+        .result-emoji {
+            font-size: 3.5rem;
+            margin-bottom: 16px;
+        }
+
+        .result-description {
+            font-size: 1.05rem;
+            color: #b0b0d0;
+            line-height: 1.7;
+            margin-bottom: 36px;
+            max-width: 480px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .share-section h3 {
+            font-size: 0.95rem;
+            color: #8888aa;
+            margin-bottom: 16px;
+            font-weight: 400;
+        }
+
+        .share-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 28px;
+        }
+
+        .share-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 50px;
+            border: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: #fff;
+        }
+
+        .share-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .share-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .share-telegram { background: #2AABEE; }
+        .share-whatsapp { background: #25D366; }
+        .share-vk { background: #4C75A3; }
+        .share-copy { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); }
+        .share-copy:hover { background: rgba(255,255,255,0.2); }
+
+        .btn-restart {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #b0b0d0;
+            padding: 12px 32px;
+            font-size: 0.95rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-restart:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+            color: #fff;
+        }
+
+        .hidden { display: none; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Result card for sharing screenshot */
+        .result-card {
+            background: linear-gradient(135deg, #1a1640, #2d2760);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 20px;
+            padding: 36px 28px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 480px) {
+            .intro h1 { font-size: 1.4rem; }
+            .result-title { font-size: 1.7rem; }
+            .result-card { padding: 28px 20px; }
+            .share-buttons { flex-direction: column; align-items: center; }
+            .share-btn { width: 220px; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <!-- Intro -->
+        <div id="intro" class="intro">
+            <h1>Тест: на каком уровне развития находится ваше сознание</h1>
+            <p>7 вопросов — и вы узнаете,<br>на каком этапе внутреннего развития находитесь</p>
+            <button class="btn-start" onclick="startQuiz()">Начать тест</button>
+        </div>
+
+        <!-- Questions -->
+        <div id="quiz" class="hidden">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+            <div class="question-counter" id="counter"></div>
+            <div class="question-card" id="questionCard">
+                <h2 id="questionText"></h2>
+                <div class="options" id="options"></div>
+            </div>
+        </div>
+
+        <!-- Result -->
+        <div id="result" class="result hidden"></div>
+    </div>
+
+    <script>
+        const questions = [
+            {
+                text: "Что вас больше всего интересует?",
+                options: ["Стабильная жизнь", "Отношения", "Смысл жизни", "Устройство мира"]
+            },
+            {
+                text: "Когда происходит трудность, вы думаете:",
+                options: ["Мне просто не повезло", "Жизнь несправедлива", "Это урок", "За этим стоит закономерность"]
+            },
+            {
+                text: "Как вы воспринимаете жизнь?",
+                options: ["Как цепочку событий", "Как борьбу", "Как процесс обучения", "Как систему законов"]
+            },
+            {
+                text: "Когда вы смотрите на мир, вы чувствуете:",
+                options: ["Интерес", "Тревогу", "Ощущение тайны", "Желание понять систему"]
+            },
+            {
+                text: "Что вас больше всего раздражает?",
+                options: ["Хаос", "Несправедливость", "Бессмысленность", "Отсутствие объяснений"]
+            },
+            {
+                text: "Когда вы слышите слово «душа», вы думаете:",
+                options: ["Религия", "Философия", "Внутренний мир", "Духовная структура"]
+            },
+            {
+                text: "Что вы ищете?",
+                options: ["Спокойствие", "Счастье", "Смысл", "Понимание законов мира"]
+            }
+        ];
+
+        const results = [
+            {
+                level: "Уровень 1",
+                title: "Наблюдатель",
+                emoji: "👁",
+                description: "Вы воспринимаете жизнь как поток событий и только начинаете задаваться глубокими вопросами. Это начало пути — и сам факт, что вы прошли этот тест, говорит о вашей готовности двигаться дальше."
+            },
+            {
+                level: "Уровень 2",
+                title: "Ищущий",
+                emoji: "🔍",
+                description: "Вы чувствуете, что в жизни есть более глубокий смысл. Вас волнуют вопросы справедливости, отношений и своего места в мире. Вы на пороге важных открытий."
+            },
+            {
+                level: "Уровень 3",
+                title: "Исследователь",
+                emoji: "🧭",
+                description: "Вы активно ищете ответы на вопросы о жизни и устройстве мира. Вы чувствуете, что за событиями стоят уроки, и стремитесь понять их смысл."
+            },
+            {
+                level: "Уровень 4",
+                title: "Познающий",
+                emoji: "✨",
+                description: "Вы готовы изучать законы реальности и применять их. Вы видите мир как систему, стремитесь к глубокому пониманию и осознанной жизни."
+            }
+        ];
+
+        let currentQuestion = 0;
+        let answers = [];
+
+        function startQuiz() {
+            document.getElementById('intro').classList.add('hidden');
+            document.getElementById('quiz').classList.remove('hidden');
+            currentQuestion = 0;
+            answers = [];
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const q = questions[currentQuestion];
+            document.getElementById('progress').style.width = ((currentQuestion / questions.length) * 100) + '%';
+            document.getElementById('counter').textContent = `Вопрос ${currentQuestion + 1} из ${questions.length}`;
+            document.getElementById('questionText').textContent = q.text;
+
+            const optionsEl = document.getElementById('options');
+            optionsEl.innerHTML = '';
+            q.options.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = () => selectAnswer(i);
+                optionsEl.appendChild(btn);
+            });
+
+            // Re-trigger animation
+            const card = document.getElementById('questionCard');
+            card.style.animation = 'none';
+            card.offsetHeight; // force reflow
+            card.style.animation = 'slideIn 0.4s ease';
+        }
+
+        function selectAnswer(index) {
+            answers.push(index);
+
+            // Brief highlight
+            const btns = document.querySelectorAll('.option-btn');
+            btns[index].classList.add('selected');
+            btns.forEach(b => b.style.pointerEvents = 'none');
+
+            setTimeout(() => {
+                currentQuestion++;
+                if (currentQuestion < questions.length) {
+                    showQuestion();
+                } else {
+                    showResult();
+                }
+            }, 300);
+        }
+
+        function calculateLevel() {
+            // Each answer maps to level 0-3, calculate average
+            const avg = answers.reduce((a, b) => a + b, 0) / answers.length;
+            if (avg < 0.75) return 0;
+            if (avg < 1.5) return 1;
+            if (avg < 2.5) return 2;
+            return 3;
+        }
+
+        function showResult() {
+            document.getElementById('quiz').classList.add('hidden');
+            const resultEl = document.getElementById('result');
+            resultEl.classList.remove('hidden');
+
+            const level = calculateLevel();
+            const r = results[level];
+
+            const shareText = `Мой результат: ${r.title} (${r.level})! Пройди тест и узнай свой уровень сознания`;
+            const shareUrl = window.location.href;
+
+            resultEl.innerHTML = `
+                <div class="result-card">
+                    <div class="result-emoji">${r.emoji}</div>
+                    <div class="result-level">${r.level}</div>
+                    <div class="result-title">${r.title}</div>
+                    <p class="result-description">${r.description}</p>
+                </div>
+                <div class="share-section">
+                    <h3>Поделиться результатом</h3>
+                    <div class="share-buttons">
+                        <a class="share-btn share-telegram"
+                           href="https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}"
+                           target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                            Telegram
+                        </a>
+                        <a class="share-btn share-whatsapp"
+                           href="https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + ' ' + shareUrl)}"
+                           target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                            WhatsApp
+                        </a>
+                        <a class="share-btn share-vk"
+                           href="https://vk.com/share.php?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}"
+                           target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.391 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4.03 8.57 4.03 8.096c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.677.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.253-1.406 2.148-3.574 2.148-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z"/></svg>
+                            ВКонтакте
+                        </a>
+                        <button class="share-btn share-copy" onclick="copyResult()">
+                            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                            Копировать
+                        </button>
+                    </div>
+                </div>
+                <button class="btn-restart" onclick="restart()">Пройти ещё раз</button>
+            `;
+
+            // Store share text for copy button
+            resultEl.dataset.shareText = shareText + '\n' + shareUrl;
+        }
+
+        function copyResult() {
+            const text = document.getElementById('result').dataset.shareText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.share-copy');
+                btn.textContent = '✓ Скопировано';
+                setTimeout(() => {
+                    btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> Копировать`;
+                }, 2000);
+            });
+        }
+
+        function restart() {
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('intro').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
