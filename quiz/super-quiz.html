@@ -729,16 +729,16 @@
                         </button>
                     </div>
                 </div>
-                ${buildProfileSection()}
+                ${(() => {
+                    const profile = JSON.parse(localStorage.getItem('quizProfile') || '{}');
+                    profile[QUIZ_ID] = { label: QUIZ_LABEL, dominant: dominant.idx, title: r.title, pcts: pcts, timestamp: Date.now() };
+                    localStorage.setItem('quizProfile', JSON.stringify(profile));
+                    return buildProfileSection();
+                })()}
                 <button class="btn-restart" onclick="restart()">Пройти ещё раз</button>
             `;
 
             resultEl.dataset.shareText = shareText + '\n' + shareUrl;
-
-            // Save to localStorage
-            const profile = JSON.parse(localStorage.getItem('quizProfile') || '{}');
-            profile[QUIZ_ID] = { label: QUIZ_LABEL, dominant: dominant.idx, title: r.title, pcts: pcts, timestamp: Date.now() };
-            localStorage.setItem('quizProfile', JSON.stringify(profile));
 
             // Animate bars
             setTimeout(() => {
