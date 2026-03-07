@@ -186,6 +186,11 @@
               cta: { text: "Записаться на курс", icon: "graduation", url: "https://kabacademy.com/mak-fall-2025/step/lp-test-mir-v3/" } }
         ];
 
+        const QUIZ_ID = 'quiz5';
+        const QUIZ_LABEL = 'Готовность к изучению законов';
+        const NEXT_QUIZ = 'profile.html';
+        const NEXT_LABEL = 'Мой профиль пути души';
+
         let currentQuestion = 0, answers = [];
 
         function startQuiz() {
@@ -288,8 +293,17 @@
                         </button>
                     </div>
                 </div>
-                <button class="btn-restart" onclick="restart()">Пройти ещё раз</button>`;
+                <button class="btn-restart" onclick="restart()">Пройти ещё раз</button>
+                <div style="margin-top:24px">
+                    <a class="cta-btn" href="${NEXT_QUIZ}" style="display:inline-flex;text-decoration:none">
+                        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                        ${NEXT_LABEL}
+                    </a>
+                </div>`;
             resultEl.dataset.shareText = shareText + '\n' + shareUrl;
+            const profile = JSON.parse(localStorage.getItem('quizProfile') || '{}');
+            profile[QUIZ_ID] = { label: QUIZ_LABEL, dominant: dominant.idx, title: r.title, pcts: pcts, timestamp: Date.now() };
+            localStorage.setItem('quizProfile', JSON.stringify(profile));
             setTimeout(() => { document.querySelectorAll('.breakdown-bar').forEach(bar => { bar.style.width = bar.dataset.target + '%'; }); }, 100);
             generateResultImage(r, sorted);
         }

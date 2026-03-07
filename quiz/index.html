@@ -540,6 +540,11 @@
             }
         ];
 
+        const QUIZ_ID = 'quiz1';
+        const QUIZ_LABEL = 'Этап поиска смысла';
+        const NEXT_QUIZ = 'quiz-2.html';
+        const NEXT_LABEL = 'Какой тип познания мира у вас';
+
         let currentQuestion = 0;
         let answers = [];
 
@@ -697,9 +702,21 @@
                     </div>
                 </div>
                 <button class="btn-restart" onclick="restart()">Пройти ещё раз</button>
+                <div style="margin-top:24px">
+                    <a class="cta-btn" href="${NEXT_QUIZ}" style="display:inline-flex;text-decoration:none">
+                        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                        Следующий тест: ${NEXT_LABEL}
+                    </a>
+                    <p style="margin-top:8px"><a href="profile.html" style="color:#8888aa;font-size:0.85rem;text-decoration:underline">Мой профиль пути</a></p>
+                </div>
             `;
 
             resultEl.dataset.shareText = shareText + '\n' + shareUrl;
+
+            // Save to localStorage
+            const profile = JSON.parse(localStorage.getItem('quizProfile') || '{}');
+            profile[QUIZ_ID] = { label: QUIZ_LABEL, dominant: dominant.idx, title: r.title, pcts: pcts, timestamp: Date.now() };
+            localStorage.setItem('quizProfile', JSON.stringify(profile));
 
             // Animate bars
             setTimeout(() => {

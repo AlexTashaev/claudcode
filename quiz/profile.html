@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой профиль пути души</title>
+    <meta property="og:title" content="Мой профиль пути души">
+    <meta property="og:description" content="Карта внутреннего пути — результаты всех тестов в одном профиле">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh; color: #e0e0e0; padding: 20px;
+        }
+        .container { max-width: 700px; margin: 0 auto; }
+
+        /* Header */
+        .header { text-align: center; margin-bottom: 40px; animation: fadeIn 0.8s ease; }
+        .header .badge {
+            display: inline-block; background: rgba(102,126,234,0.15);
+            border: 1px solid rgba(102,126,234,0.3); color: #667eea;
+            padding: 6px 16px; border-radius: 50px; font-size: 0.85rem;
+            margin-bottom: 16px; letter-spacing: 1px;
+        }
+        .header h1 { font-size: 2rem; color: #fff; margin-bottom: 8px; }
+        .header p { color: #8888aa; font-size: 1rem; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center; padding: 60px 20px;
+            animation: fadeIn 0.8s ease;
+        }
+        .empty-state .icon { font-size: 4rem; margin-bottom: 20px; }
+        .empty-state h2 { color: #fff; font-size: 1.4rem; margin-bottom: 12px; }
+        .empty-state p { color: #8888aa; margin-bottom: 32px; line-height: 1.6; }
+        .btn-primary {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: linear-gradient(135deg, #667eea, #764ba2); color: #fff;
+            border: none; padding: 16px 36px; font-size: 1.05rem; border-radius: 50px;
+            cursor: pointer; text-decoration: none;
+            box-shadow: 0 4px 20px rgba(102,126,234,0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(102,126,234,0.6); }
+
+        /* Soul path level */
+        .soul-level {
+            text-align: center; margin-bottom: 40px; animation: fadeIn 0.8s ease;
+        }
+        .soul-level .emoji { font-size: 4rem; margin-bottom: 8px; }
+        .soul-level .level-label {
+            font-size: 0.9rem; color: #667eea; text-transform: uppercase;
+            letter-spacing: 3px; margin-bottom: 4px;
+        }
+        .soul-level .level-title { font-size: 2.4rem; color: #fff; margin-bottom: 8px; }
+        .soul-level .level-desc { color: #b0b0d0; font-size: 1rem; line-height: 1.6; max-width: 500px; margin: 0 auto; }
+
+        /* Path map */
+        .path-map {
+            background: rgba(26, 22, 64, 0.5); border: 1px solid rgba(102,126,234,0.2);
+            border-radius: 20px; padding: 32px; margin-bottom: 32px;
+            animation: fadeIn 0.8s ease 0.2s both;
+        }
+        .path-map h2 { text-align: center; color: #fff; font-size: 1.2rem; margin-bottom: 28px; }
+
+        .path-steps { position: relative; padding-left: 40px; }
+        .path-step {
+            position: relative; padding-bottom: 28px; padding-left: 24px;
+        }
+        .path-step:last-child { padding-bottom: 0; }
+
+        /* Vertical line */
+        .path-step::before {
+            content: ''; position: absolute; left: -40px; top: 6px;
+            width: 2px; height: calc(100%); background: rgba(255,255,255,0.1);
+        }
+        .path-step:last-child::before { display: none; }
+
+        /* Dot */
+        .path-step::after {
+            content: ''; position: absolute; left: -46px; top: 4px;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.2);
+        }
+        .path-step.completed::after {
+            background: #667eea; border-color: #667eea;
+            box-shadow: 0 0 8px rgba(102,126,234,0.5);
+        }
+        .path-step.completed::before { background: #667eea; }
+        .path-step.current::after {
+            background: #a855f7; border-color: #a855f7;
+            box-shadow: 0 0 12px rgba(168,85,247,0.6);
+            width: 18px; height: 18px; left: -48px; top: 2px;
+        }
+        .path-step.current::before { background: linear-gradient(to bottom, #667eea, rgba(255,255,255,0.1)); }
+
+        .step-title { font-size: 1.05rem; color: #fff; margin-bottom: 2px; }
+        .step-desc { font-size: 0.85rem; color: #8888aa; }
+        .path-step.future .step-title { color: #555577; }
+        .path-step.future .step-desc { color: #444466; }
+        .path-step.current .step-title { color: #a855f7; font-weight: 600; font-size: 1.15rem; }
+        .current-marker {
+            display: inline-block; font-size: 0.75rem; color: #a855f7;
+            border: 1px solid rgba(168,85,247,0.4); padding: 2px 10px;
+            border-radius: 50px; margin-left: 8px; vertical-align: middle;
+        }
+
+        /* Quiz results grid */
+        .results-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+            margin-bottom: 32px; animation: fadeIn 0.8s ease 0.3s both;
+        }
+        .result-item {
+            background: rgba(26, 22, 64, 0.5); border: 1px solid rgba(102,126,234,0.2);
+            border-radius: 16px; padding: 20px; text-align: center;
+            transition: transform 0.2s;
+        }
+        .result-item:hover { transform: translateY(-2px); }
+        .result-item.empty {
+            border-style: dashed; opacity: 0.5;
+        }
+        .result-item .ri-label { font-size: 0.8rem; color: #8888aa; margin-bottom: 8px; }
+        .result-item .ri-value { font-size: 1.2rem; color: #fff; font-weight: 600; }
+        .result-item .ri-emoji { font-size: 1.5rem; margin-bottom: 4px; }
+        .result-item.empty .ri-value { color: #555577; }
+        .result-item a { color: #667eea; text-decoration: none; font-size: 0.85rem; }
+        .result-item a:hover { text-decoration: underline; }
+
+        /* Progress count */
+        .progress-section {
+            text-align: center; margin-bottom: 32px;
+            animation: fadeIn 0.8s ease 0.1s both;
+        }
+        .progress-dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 12px; }
+        .progress-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+        }
+        .progress-dot.done { background: #667eea; border-color: #667eea; }
+        .progress-label { font-size: 0.85rem; color: #8888aa; }
+
+        /* Recommendation */
+        .recommendation {
+            background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(168,85,247,0.15));
+            border: 1px solid rgba(102,126,234,0.3); border-radius: 20px;
+            padding: 32px; text-align: center; margin-bottom: 32px;
+            animation: fadeIn 0.8s ease 0.4s both;
+        }
+        .recommendation h3 { color: #fff; font-size: 1.2rem; margin-bottom: 12px; }
+        .recommendation p { color: #b0b0d0; margin-bottom: 24px; line-height: 1.6; }
+
+        /* Share card */
+        .share-card { margin-bottom: 32px; text-align: center; animation: fadeIn 0.8s ease 0.5s both; }
+        .share-card canvas { display: none; }
+        .share-card img { max-width: 100%; border-radius: 16px; border: 1px solid rgba(102,126,234,0.2); }
+        .btn-download {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+            color: #b0b0d0; padding: 10px 20px; font-size: 0.85rem; border-radius: 50px;
+            cursor: pointer; transition: all 0.2s; margin-top: 12px;
+        }
+        .btn-download:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        .btn-download svg { width: 16px; height: 16px; fill: currentColor; }
+
+        /* Share */
+        .share-section { text-align: center; margin-bottom: 32px; animation: fadeIn 0.8s ease 0.5s both; }
+        .share-section h3 { font-size: 0.95rem; color: #8888aa; margin-bottom: 16px; font-weight: 400; }
+        .share-buttons { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+        .share-btn {
+            display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px;
+            border-radius: 50px; border: none; font-size: 0.9rem; cursor: pointer;
+            transition: transform 0.2s; text-decoration: none; color: #fff;
+        }
+        .share-btn:hover { transform: translateY(-2px); }
+        .share-btn svg { width: 18px; height: 18px; fill: currentColor; }
+        .share-telegram { background: #2AABEE; } .share-whatsapp { background: #25D366; }
+        .share-vk { background: #4C75A3; }
+        .share-copy { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); }
+
+        /* Reset */
+        .reset-section { text-align: center; margin-bottom: 40px; }
+        .btn-reset {
+            background: transparent; border: 1px solid rgba(255,255,255,0.15);
+            color: #666688; padding: 10px 24px; font-size: 0.85rem; border-radius: 50px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .btn-reset:hover { border-color: rgba(255,255,255,0.3); color: #8888aa; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 480px) {
+            .results-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.5rem; }
+            .soul-level .level-title { font-size: 1.8rem; }
+            .share-buttons { flex-direction: column; align-items: center; }
+            .share-btn { width: 220px; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app"></div>
+
+    <script>
+        const typeNames = ['Наблюдатель', 'Ищущий', 'Исследователь', 'Познающий'];
+        const typeEmojis = ['👁', '🔍', '🧭', '✨'];
+
+        const quizMeta = [
+            { id: 'quiz1', label: 'Этап поиска смысла', url: 'index.html' },
+            { id: 'quiz2', label: 'Тип познания мира', url: 'quiz-2.html' },
+            { id: 'quiz3', label: 'Главный внутренний вопрос', url: 'quiz-3.html' },
+            { id: 'quiz4', label: 'Глубина восприятия', url: 'quiz-4.html' },
+            { id: 'quiz5', label: 'Готовность к познанию', url: 'quiz-5.html' }
+        ];
+
+        const soulLevels = [
+            { title: 'Спящий', emoji: '💤', desc: 'Вы ещё не начали свой путь. Пройдите первый тест, чтобы узнать, где вы находитесь.' },
+            { title: 'Наблюдатель', emoji: '👁', desc: 'Вы начинаете замечать, что в жизни есть нечто большее. Первые вопросы уже появились.' },
+            { title: 'Искатель', emoji: '🔍', desc: 'Вы чувствуете тягу к пониманию. Вопросы о смысле становятся частью вашей жизни.' },
+            { title: 'Путник', emoji: '🚶', desc: 'Вы активно ищете ответы. Ваш путь познания набирает силу, и вы готовы к открытиям.' },
+            { title: 'Исследователь', emoji: '🧭', desc: 'Вы видите связи и закономерности. Ваше восприятие углубляется с каждым шагом.' },
+            { title: 'Познающий', emoji: '✨', desc: 'Вы стремитесь к системному пониманию реальности. Вы готовы изучать законы жизни.' },
+            { title: 'Проводник', emoji: '🌟', desc: 'Вы не просто познаёте — вы готовы делиться знаниями и вести за собой других.' }
+        ];
+
+        function getProfile() {
+            return JSON.parse(localStorage.getItem('quizProfile') || '{}');
+        }
+
+        function calculateSoulLevel(profile) {
+            const completed = quizMeta.filter(q => profile[q.id]);
+            if (completed.length === 0) return 0;
+
+            // Average dominant type index across completed quizzes (0-3)
+            const avgDominant = completed.reduce((sum, q) => sum + profile[q.id].dominant, 0) / completed.length;
+            // Factor in how many quizzes completed (0-5)
+            const completionFactor = completed.length / quizMeta.length;
+
+            // Scale: 0-3 dominant * completion weight → 0-6 soul level
+            // More quizzes completed + higher type = higher soul level
+            const raw = avgDominant * 1.2 + completionFactor * 2.5;
+            return Math.min(6, Math.max(1, Math.round(raw)));
+        }
+
+        function getNextQuiz(profile) {
+            for (const q of quizMeta) {
+                if (!profile[q.id]) return q;
+            }
+            return null;
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            const profile = getProfile();
+            const completed = quizMeta.filter(q => profile[q.id]);
+
+            if (completed.length === 0) {
+                app.innerHTML = `
+                    <div class="header">
+                        <div class="badge">ПРОФИЛЬ ПУТИ ДУШИ</div>
+                        <h1>Ваш путь ещё не начался</h1>
+                    </div>
+                    <div class="empty-state">
+                        <div class="icon">🌌</div>
+                        <h2>Пройдите первый тест</h2>
+                        <p>Начните с теста «Этап поиска смысла»,<br>чтобы узнать, где вы находитесь на пути познания</p>
+                        <a class="btn-primary" href="index.html">Начать путь</a>
+                    </div>`;
+                return;
+            }
+
+            const soulIdx = calculateSoulLevel(profile);
+            const soul = soulLevels[soulIdx];
+            const nextQuiz = getNextQuiz(profile);
+
+            // Build results grid
+            const gridHTML = quizMeta.map(q => {
+                const r = profile[q.id];
+                if (r) {
+                    return `<div class="result-item">
+                        <div class="ri-label">${q.label}</div>
+                        <div class="ri-emoji">${typeEmojis[r.dominant]}</div>
+                        <div class="ri-value">${r.title}</div>
+                    </div>`;
+                } else {
+                    return `<div class="result-item empty">
+                        <div class="ri-label">${q.label}</div>
+                        <div class="ri-emoji">?</div>
+                        <div class="ri-value">Не пройден</div>
+                        <a href="${q.url}">Пройти тест</a>
+                    </div>`;
+                }
+            }).join('');
+
+            // Progress dots
+            const dotsHTML = quizMeta.map(q => `<div class="progress-dot${profile[q.id] ? ' done' : ''}"></div>`).join('');
+
+            // Path map
+            const pathHTML = soulLevels.map((lvl, i) => {
+                let cls = 'path-step';
+                if (i < soulIdx) cls += ' completed';
+                else if (i === soulIdx) cls += ' current';
+                else cls += ' future';
+                return `<div class="${cls}">
+                    <div class="step-title">${lvl.emoji} ${lvl.title}${i === soulIdx ? '<span class="current-marker">ваш уровень</span>' : ''}</div>
+                    <div class="step-desc">${i <= soulIdx ? lvl.desc : ''}</div>
+                </div>`;
+            }).join('');
+
+            // Recommendation
+            let recHTML = '';
+            if (nextQuiz) {
+                recHTML = `
+                    <div class="recommendation">
+                        <h3>Следующий шаг</h3>
+                        <p>Пройдите тест «${nextQuiz.label}»,<br>чтобы углубить ваш профиль и продвинуться по пути</p>
+                        <a class="btn-primary" href="${nextQuiz.url}">Пройти следующий тест</a>
+                    </div>`;
+            } else {
+                recHTML = `
+                    <div class="recommendation">
+                        <h3>Все тесты пройдены!</h3>
+                        <p>Вы прошли весь путь диагностики. Ваш профиль полностью сформирован.<br>Следующий шаг — изучение законов жизни на вводном курсе.</p>
+                        <a class="btn-primary" href="https://kabacademy.com/mak-fall-2025/step/lp-test-mir-v3/" target="_blank" rel="noopener">Начать обучение</a>
+                    </div>`;
+            }
+
+            // Share text
+            const shareText = `Мой уровень на пути души — ${soul.title} ${soul.emoji}\n${completed.map(q => `${q.label}: ${profile[q.id].title}`).join('\n')}\nПройди тесты и узнай свой уровень`;
+            const shareUrl = window.location.href;
+
+            app.innerHTML = `
+                <div class="header">
+                    <div class="badge">ПРОФИЛЬ ПУТИ ДУШИ</div>
+                    <h1>Ваша карта пути</h1>
+                    <p>Результаты ${completed.length} из ${quizMeta.length} тестов</p>
+                </div>
+
+                <div class="progress-section">
+                    <div class="progress-dots">${dotsHTML}</div>
+                    <div class="progress-label">Пройдено тестов: ${completed.length} из ${quizMeta.length}</div>
+                </div>
+
+                <div class="soul-level">
+                    <div class="emoji">${soul.emoji}</div>
+                    <div class="level-label">Ваш уровень пути</div>
+                    <div class="level-title">${soul.title}</div>
+                    <div class="level-desc">${soul.desc}</div>
+                </div>
+
+                <div class="path-map">
+                    <h2>Карта пути души</h2>
+                    <div class="path-steps">${pathHTML}</div>
+                </div>
+
+                <div class="results-grid">${gridHTML}</div>
+
+                ${recHTML}
+
+                <div class="share-card">
+                    <canvas id="profileCanvas" width="1080" height="1350"></canvas>
+                    <img id="profileImage" alt="Мой профиль пути души">
+                    <br>
+                    <button class="btn-download" onclick="downloadImage()">
+                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                        Скачать картинку
+                    </button>
+                </div>
+
+                <div class="share-section">
+                    <h3>Поделиться профилем</h3>
+                    <div class="share-buttons">
+                        <a class="share-btn share-telegram" href="https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}" target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                            Telegram
+                        </a>
+                        <a class="share-btn share-whatsapp" href="https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + '\n' + shareUrl)}" target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                            WhatsApp
+                        </a>
+                        <a class="share-btn share-vk" href="https://vk.com/share.php?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}" target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.391 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4.03 8.57 4.03 8.096c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.677.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.253-1.406 2.148-3.574 2.148-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z"/></svg>
+                            ВКонтакте
+                        </a>
+                        <button class="share-btn share-copy" onclick="copyProfile()">
+                            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                            Копировать
+                        </button>
+                    </div>
+                </div>
+
+                <div class="reset-section">
+                    <button class="btn-reset" onclick="resetProfile()">Сбросить все результаты</button>
+                </div>`;
+
+            app.dataset.shareText = shareText + '\n' + shareUrl;
+
+            generateProfileImage(soul, soulIdx, profile, completed);
+        }
+
+        function generateProfileImage(soul, soulIdx, profile, completed) {
+            const canvas = document.getElementById('profileCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const W = 1080, H = 1350;
+
+            // Background
+            const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+            bgGrad.addColorStop(0, '#0f0c29'); bgGrad.addColorStop(0.5, '#302b63'); bgGrad.addColorStop(1, '#24243e');
+            ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
+
+            // Decorative
+            ctx.globalAlpha = 0.06; ctx.fillStyle = '#667eea';
+            ctx.beginPath(); ctx.arc(900, 200, 200, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(150, 1200, 180, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+
+            // Card
+            ctx.fillStyle = 'rgba(26, 22, 64, 0.7)';
+            roundRect(ctx, 50, 50, W - 100, H - 100, 30); ctx.fill();
+            ctx.strokeStyle = 'rgba(102, 126, 234, 0.3)'; ctx.lineWidth = 2;
+            roundRect(ctx, 50, 50, W - 100, H - 100, 30); ctx.stroke();
+
+            // Badge
+            ctx.fillStyle = 'rgba(102,126,234,0.15)';
+            roundRect(ctx, (W - 300) / 2, 90, 300, 36, 18); ctx.fill();
+            ctx.fillStyle = '#667eea'; ctx.font = '600 16px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('ПРОФИЛЬ ПУТИ ДУШИ', W / 2, 114);
+
+            // Soul emoji + title
+            ctx.font = '80px sans-serif'; ctx.fillText(soul.emoji, W / 2, 210);
+            ctx.fillStyle = '#667eea'; ctx.font = '600 24px "Segoe UI", sans-serif';
+            ctx.fillText('МОЙ УРОВЕНЬ ПУТИ', W / 2, 260);
+            ctx.fillStyle = '#fff'; ctx.font = '700 56px "Segoe UI", sans-serif';
+            ctx.fillText(soul.title, W / 2, 320);
+
+            // Divider
+            ctx.strokeStyle = 'rgba(102,126,234,0.3)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(W / 2 - 120, 355); ctx.lineTo(W / 2 + 120, 355); ctx.stroke();
+
+            // Path visualization (horizontal)
+            const pathY = 410;
+            const pathStartX = 120, pathEndX = W - 120;
+            const stepW = (pathEndX - pathStartX) / (soulLevels.length - 1);
+            const dotR = 10;
+
+            // Path line
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(pathStartX, pathY); ctx.lineTo(pathEndX, pathY); ctx.stroke();
+
+            // Completed line
+            if (soulIdx > 0) {
+                const completedX = pathStartX + soulIdx * stepW;
+                const grad = ctx.createLinearGradient(pathStartX, 0, completedX, 0);
+                grad.addColorStop(0, '#667eea'); grad.addColorStop(1, '#a855f7');
+                ctx.strokeStyle = grad; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(pathStartX, pathY); ctx.lineTo(completedX, pathY); ctx.stroke();
+            }
+
+            // Dots + labels
+            soulLevels.forEach((lvl, i) => {
+                const x = pathStartX + i * stepW;
+                ctx.beginPath(); ctx.arc(x, pathY, i === soulIdx ? 14 : dotR, 0, Math.PI * 2);
+                if (i < soulIdx) { ctx.fillStyle = '#667eea'; }
+                else if (i === soulIdx) { ctx.fillStyle = '#a855f7'; }
+                else { ctx.fillStyle = 'rgba(255,255,255,0.15)'; }
+                ctx.fill();
+                if (i === soulIdx) {
+                    ctx.strokeStyle = 'rgba(168,85,247,0.4)'; ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.arc(x, pathY, 20, 0, Math.PI * 2); ctx.stroke();
+                }
+
+                ctx.fillStyle = i <= soulIdx ? '#b0b0d0' : '#444466';
+                ctx.font = '400 14px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(lvl.title, x, pathY + 32);
+            });
+
+            // Quiz results
+            let y = 490;
+            ctx.fillStyle = '#8888aa'; ctx.font = '600 20px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('РЕЗУЛЬТАТЫ ТЕСТОВ', W / 2, y);
+            y += 40;
+
+            const colW = (W - 200) / 2;
+            quizMeta.forEach((q, i) => {
+                const r = profile[q.id];
+                const col = i % 2;
+                const row = Math.floor(i / 2);
+                const cx = 130 + col * (colW + 20) + colW / 2;
+                const cy = y + row * 100;
+
+                // Card bg
+                ctx.fillStyle = r ? 'rgba(102,126,234,0.08)' : 'rgba(255,255,255,0.03)';
+                roundRect(ctx, cx - colW / 2, cy - 10, colW, 80, 12); ctx.fill();
+                ctx.strokeStyle = r ? 'rgba(102,126,234,0.2)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+                roundRect(ctx, cx - colW / 2, cy - 10, colW, 80, 12); ctx.stroke();
+
+                ctx.font = '400 16px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+                ctx.fillStyle = '#8888aa'; ctx.fillText(q.label, cx, cy + 18);
+                ctx.font = '700 22px "Segoe UI", sans-serif';
+                ctx.fillStyle = r ? '#fff' : '#444466';
+                ctx.fillText(r ? `${typeEmojis[r.dominant]} ${r.title}` : '—', cx, cy + 48);
+            });
+
+            // Bottom text
+            const bottomY = y + Math.ceil(quizMeta.length / 2) * 100 + 40;
+            ctx.fillStyle = '#8888aa'; ctx.font = '400 18px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('Пройди тесты и узнай свой путь души', W / 2, bottomY);
+
+            document.getElementById('profileImage').src = canvas.toDataURL('image/png');
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+        }
+
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = 'мой-путь-души.png';
+            link.href = document.getElementById('profileCanvas').toDataURL('image/png');
+            link.click();
+        }
+
+        function copyProfile() {
+            const text = document.getElementById('app').dataset.shareText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.share-copy');
+                btn.textContent = '\u2713 Скопировано';
+                setTimeout(() => {
+                    btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> Копировать';
+                }, 2000);
+            });
+        }
+
+        function resetProfile() {
+            if (confirm('Сбросить все результаты тестов? Это действие нельзя отменить.')) {
+                localStorage.removeItem('quizProfile');
+                render();
+            }
+        }
+
+        render();
+    </script>
+</body>
+</html>
