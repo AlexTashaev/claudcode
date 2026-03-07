@@ -697,27 +697,27 @@
             ctx.lineTo(W / 2 + 150, 440);
             ctx.stroke();
 
-            // Percentage bars
+            // Percentage bars — keep inside card with generous margins
             const barStartY = 500;
-            const barLeftX = 160;
-            const barWidth = 560;
-            const barHeight = 24;
-            const barGap = 70;
+            const barLeftX = 300;
+            const barWidth = 400;
+            const barHeight = 22;
+            const barGap = 64;
 
             const barColors = ['#5b7db1', '#667eea', '#8b5cf6', '#a855f7'];
 
             sorted.forEach((s, i) => {
                 const y = barStartY + i * barGap;
 
-                // Label
+                // Label (left of bar, inside card)
                 ctx.fillStyle = '#b0b0d0';
-                ctx.font = '400 26px "Segoe UI", sans-serif';
+                ctx.font = '400 24px "Segoe UI", sans-serif';
                 ctx.textAlign = 'right';
-                ctx.fillText(s.type.title, barLeftX - 20, y + 18);
+                ctx.fillText(s.type.title, barLeftX - 16, y + 16);
 
                 // Bar background
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-                roundRect(ctx, barLeftX, y, barWidth, barHeight, 12);
+                roundRect(ctx, barLeftX, y, barWidth, barHeight, 11);
                 ctx.fill();
 
                 // Bar fill
@@ -727,15 +727,15 @@
                     barGradient.addColorStop(0, barColors[s.idx]);
                     barGradient.addColorStop(1, barColors[s.idx] + 'cc');
                     ctx.fillStyle = barGradient;
-                    roundRect(ctx, barLeftX, y, Math.max(fillW, 12), barHeight, 12);
+                    roundRect(ctx, barLeftX, y, Math.max(fillW, 12), barHeight, 11);
                     ctx.fill();
                 }
 
-                // Percentage text
+                // Percentage text (right of bar, inside card)
                 ctx.fillStyle = '#ffffff';
-                ctx.font = '700 28px "Segoe UI", sans-serif';
+                ctx.font = '700 26px "Segoe UI", sans-serif';
                 ctx.textAlign = 'left';
-                ctx.fillText(`${s.pct}%`, barLeftX + barWidth + 20, y + 19);
+                ctx.fillText(`${s.pct}%`, barLeftX + barWidth + 14, y + 17);
             });
 
             // Bottom text
