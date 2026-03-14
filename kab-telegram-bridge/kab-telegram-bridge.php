@@ -4,7 +4,7 @@
  * Description: Customizes WP Telegram Login integration for kabacademy.com.
  *              Enforces existing-users-only login, ensures Moodle linking via
  *              Edwiser Bridge, and provides custom widget placement.
- * Version: 2.0.0
+ * Version: 2.1.0
  * Author: KAB Academy
  */
 
@@ -13,7 +13,26 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'KAB_TELEGRAM_BRIDGE_DIR', plugin_dir_path( __FILE__ ) . 'kab-telegram-bridge/' );
-define( 'KAB_TELEGRAM_BRIDGE_VER', '2.0.0' );
+define( 'KAB_TELEGRAM_BRIDGE_VER', '2.1.0' );
+
+// ============================================================
+// SendPulse & Lesson settings — change these for your setup.
+// ============================================================
+// SendPulse API credentials (https://login.sendpulse.com/account/api/).
+if ( ! defined( 'KAB_SP_CLIENT_ID' ) ) {
+    define( 'KAB_SP_CLIENT_ID', '' ); // TODO: Set your SendPulse Client ID.
+}
+if ( ! defined( 'KAB_SP_CLIENT_SECRET' ) ) {
+    define( 'KAB_SP_CLIENT_SECRET', '' ); // TODO: Set your SendPulse Client Secret.
+}
+// SendPulse Telegram bot ID (from bot settings in SendPulse dashboard).
+if ( ! defined( 'KAB_SP_BOT_ID' ) ) {
+    define( 'KAB_SP_BOT_ID', '' ); // TODO: Set your SendPulse Bot ID.
+}
+// URL of the first Moodle lesson to redirect to after Telegram connect.
+if ( ! defined( 'KAB_FIRST_LESSON_URL' ) ) {
+    define( 'KAB_FIRST_LESSON_URL', '' ); // TODO: Set lesson URL, e.g. https://edu.kabacademy.com/mod/lesson/view.php?id=123
+}
 
 /**
  * Write to our own log file so we can debug without WP_DEBUG.
@@ -62,6 +81,8 @@ try {
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-moodle-linker.php';
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-telegram-widget.php';
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-login-customizer.php';
+    require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-sendpulse.php';
+    require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-thankyou.php';
 } catch ( \Throwable $e ) {
     kab_log( 'FATAL: Failed to load class files — ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
     return;
@@ -122,6 +143,8 @@ add_action( 'plugins_loaded', function () {
         KAB_Moodle_Linker::init();
         KAB_Telegram_Widget::init();
         KAB_Login_Customizer::init();
+        KAB_SendPulse::init();
+        KAB_ThankYou::init();
     } catch ( \Throwable $e ) {
         kab_log( 'INIT ERROR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
     }

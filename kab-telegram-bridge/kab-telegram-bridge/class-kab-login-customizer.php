@@ -357,6 +357,13 @@ class KAB_Login_Customizer {
             return;
         }
 
+        // If user is already logged in, this is a "connect Telegram" flow
+        // (e.g. from the Thank You page). Let WP Telegram Login handle
+        // the linking natively — no need for our custom linking page.
+        if ( is_user_logged_in() ) {
+            return;
+        }
+
         // phpcs:ignore WordPress.Security.NonceVerification
         $tg_id = isset( $_REQUEST['id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['id'] ) ) : '';
         if ( empty( $tg_id ) ) {
