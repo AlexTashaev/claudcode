@@ -4,7 +4,7 @@
  * Description: Customizes WP Telegram Login integration for kabacademy.com.
  *              Enforces existing-users-only login, ensures Moodle linking via
  *              Edwiser Bridge, and provides custom widget placement.
- * Version: 2.1.0
+ * Version: 2.2.0
  * Author: KAB Academy
  */
 
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'KAB_TELEGRAM_BRIDGE_DIR', plugin_dir_path( __FILE__ ) . 'kab-telegram-bridge/' );
-define( 'KAB_TELEGRAM_BRIDGE_VER', '2.1.0' );
+define( 'KAB_TELEGRAM_BRIDGE_VER', '2.2.0' );
 
 // ============================================================
 // SendPulse & Lesson settings — change these for your setup.
@@ -81,6 +81,7 @@ try {
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-moodle-linker.php';
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-telegram-widget.php';
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-login-customizer.php';
+    require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-settings.php';
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-sendpulse.php';
     require_once KAB_TELEGRAM_BRIDGE_DIR . 'class-kab-thankyou.php';
 } catch ( \Throwable $e ) {
@@ -142,6 +143,7 @@ add_action( 'plugins_loaded', function () {
         KAB_Telegram_Guard::init();
         KAB_Moodle_Linker::init();
         KAB_Telegram_Widget::init();
+        KAB_Settings::init();
         KAB_Login_Customizer::init();
         KAB_SendPulse::init();
         KAB_ThankYou::init();

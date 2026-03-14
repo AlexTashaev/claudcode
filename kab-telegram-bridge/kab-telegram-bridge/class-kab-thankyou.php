@@ -36,7 +36,7 @@ class KAB_ThankYou {
             return;
         }
 
-        $lesson_url = defined( 'KAB_FIRST_LESSON_URL' ) ? KAB_FIRST_LESSON_URL : '';
+        $lesson_url = KAB_Settings::get( 'first_lesson_url' );
         if ( ! $lesson_url ) {
             return;
         }
@@ -47,7 +47,6 @@ class KAB_ThankYou {
         }
 
         setcookie( 'kab_moodle_redirect', $lesson_url, time() + 600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
-        // Make available in the same request (for the shortcode).
         $_COOKIE['kab_moodle_redirect'] = $lesson_url;
     }
 
@@ -70,7 +69,7 @@ class KAB_ThankYou {
         }
 
         $atts = shortcode_atts( array(
-            'lesson_url' => defined( 'KAB_FIRST_LESSON_URL' ) ? KAB_FIRST_LESSON_URL : '',
+            'lesson_url' => KAB_Settings::get( 'first_lesson_url' ),
         ), $atts, 'kab_thankyou_block' );
 
         $lesson_url = $atts['lesson_url'];

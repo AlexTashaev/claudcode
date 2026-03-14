@@ -30,7 +30,7 @@ class KAB_SendPulse {
             return;
         }
 
-        if ( ! defined( 'KAB_SP_BOT_ID' ) || ! KAB_SP_BOT_ID ) {
+        if ( ! KAB_Settings::get( 'sp_bot_id' ) ) {
             return;
         }
 
@@ -85,7 +85,7 @@ class KAB_SendPulse {
         }
 
         $body = array(
-            'bot_id'      => KAB_SP_BOT_ID,
+            'bot_id'      => KAB_Settings::get( 'sp_bot_id' ),
             'telegram_id' => $tg_id,
             'variables'   => array(
                 array( 'name' => 'email', 'value' => $user->user_email ),
@@ -143,15 +143,18 @@ class KAB_SendPulse {
             return $cached;
         }
 
-        if ( ! defined( 'KAB_SP_CLIENT_ID' ) || ! defined( 'KAB_SP_CLIENT_SECRET' ) ) {
+        $client_id     = KAB_Settings::get( 'sp_client_id' );
+        $client_secret = KAB_Settings::get( 'sp_client_secret' );
+
+        if ( ! $client_id || ! $client_secret ) {
             return null;
         }
 
         $response = wp_remote_post( 'https://api.sendpulse.com/oauth/access_token', array(
             'body'    => array(
                 'grant_type'    => 'client_credentials',
-                'client_id'     => KAB_SP_CLIENT_ID,
-                'client_secret' => KAB_SP_CLIENT_SECRET,
+                'client_id'     => $client_id,
+                'client_secret' => $client_secret,
             ),
             'timeout' => 10,
         ) );
