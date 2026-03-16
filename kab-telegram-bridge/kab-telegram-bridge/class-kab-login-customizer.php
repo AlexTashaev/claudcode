@@ -344,18 +344,18 @@ class KAB_Login_Customizer {
             return $redirect;
         }
 
+        // TG callback with lesson redirect cookie → route through SSO handler.
+        // This MUST run before get_return_url() which returns the checkout page.
+        if ( $is_tg_cb && ( ! empty( $_COOKIE['kab_moodle_redirect'] ) || self::$pending_moodle_target ) ) {
+            kab_log( 'intercept_tg_redirect: Lesson redirect found, routing to SSO handler.' );
+            return home_url( '/?kab_goto_lesson=1' );
+        }
+
         // WordPress return URL.
         $return_url = self::get_return_url();
         if ( $return_url ) {
             kab_log( 'intercept_tg_redirect: Returning to ' . $return_url );
             return $return_url;
-        }
-
-        // TG callback with lesson redirect cookie → route through SSO handler
-        // so the user gets a Moodle session instead of landing on checkout.
-        if ( $is_tg_cb && ( ! empty( $_COOKIE['kab_moodle_redirect'] ) || self::$pending_moodle_target ) ) {
-            kab_log( 'intercept_tg_redirect: Lesson redirect found, routing to SSO handler.' );
-            return home_url( '/?kab_goto_lesson=1' );
         }
 
         return $location;

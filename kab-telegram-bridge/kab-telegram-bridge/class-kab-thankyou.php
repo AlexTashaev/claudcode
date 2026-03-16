@@ -97,30 +97,28 @@ class KAB_ThankYou {
         }
 
         // --- Approach 2: Try do_action('wp_login') to trigger EB SSO hooks ---
-        if ( function_exists( 'edwiser_bridge_instance' ) ) {
-            add_filter( 'eb_sso_login_url', function () use ( $lesson_url ) {
-                return $lesson_url;
-            }, 999 );
+        add_filter( 'eb_sso_login_url', function () use ( $lesson_url ) {
+            return $lesson_url;
+        }, 999 );
 
-            // Remove our own hooks to avoid interference.
-            remove_action( 'wp_login', array( 'KAB_Login_Customizer', 'redirect_before_eb_sso' ), 8 );
-            remove_action( 'wp_login', array( 'KAB_Moodle_Linker', 'check_moodle_link_on_login' ), 5 );
-            remove_filter( 'wp_redirect', array( 'KAB_Login_Customizer', 'intercept_telegram_login_redirect' ), 999 );
+        // Remove our own hooks to avoid interference.
+        remove_action( 'wp_login', array( 'KAB_Login_Customizer', 'redirect_before_eb_sso' ), 8 );
+        remove_action( 'wp_login', array( 'KAB_Moodle_Linker', 'check_moodle_link_on_login' ), 5 );
+        remove_filter( 'wp_redirect', array( 'KAB_Login_Customizer', 'intercept_telegram_login_redirect' ), 999 );
 
-            // Log registered wp_login hooks for debugging.
-            global $wp_filter;
-            if ( isset( $wp_filter['wp_login'] ) ) {
-                foreach ( $wp_filter['wp_login']->callbacks as $pri => $hooks ) {
-                    foreach ( $hooks as $id => $_ ) {
-                        kab_log( "handle_lesson_redirect: wp_login hook[$pri]: $id" );
-                    }
+        // Log registered wp_login hooks for debugging.
+        global $wp_filter;
+        if ( isset( $wp_filter['wp_login'] ) ) {
+            foreach ( $wp_filter['wp_login']->callbacks as $pri => $hooks ) {
+                foreach ( $hooks as $id => $_ ) {
+                    kab_log( "handle_lesson_redirect: wp_login hook[$pri]: $id" );
                 }
             }
-
-            kab_log( 'handle_lesson_redirect: Firing do_action(wp_login).' );
-            do_action( 'wp_login', $user->user_login, $user );
-            kab_log( 'handle_lesson_redirect: do_action(wp_login) did not redirect.' );
         }
+
+        kab_log( 'handle_lesson_redirect: Firing do_action(wp_login).' );
+        do_action( 'wp_login', $user->user_login, $user );
+        kab_log( 'handle_lesson_redirect: do_action(wp_login) did not redirect.' );
 
         // --- Approach 3: Fall back to direct Moodle URL ---
         kab_log( 'handle_lesson_redirect: All SSO approaches failed. Falling back to direct URL: ' . $lesson_url );
@@ -170,26 +168,32 @@ class KAB_ThankYou {
             }
         }
 
-        // Also check array-style settings.
-        if ( ! $sso_key ) {
-            $sso_settings = get_option( 'eb_sso_settings' );
+        // Check array-style settings (different EB SSO versions use different option names).
+        $sso_option_names = array(
+            'eb_sso_settings_general',
+            'eb_sso_settings',
+            'eb_sso_settings_redirection',
+        );
+        foreach ( $sso_option_names as $opt_name ) {
+            if ( $sso_key ) {
+                break;
+            }
+            $sso_settings = get_option( $opt_name );
             if ( is_array( $sso_settings ) ) {
-                $sso_key = $sso_settings['eb_sso_secret_key']
-                    ?? $sso_settings['secret_key']
-                    ?? '';
+                kab_log( 'generate_eb_sso_url: Option ' . $opt_name . ' = ' . wp_json_encode( $sso_settings ) );
+                // Look for any key containing "secret".
+                foreach ( $sso_settings as $k => $v ) {
+                    if ( is_string( $v ) && '' !== $v && false !== stripos( $k, 'secret' ) ) {
+                        $sso_key = $v;
+                        kab_log( 'generate_eb_sso_url: Found SSO key in ' . $opt_name . '[' . $k . ']' );
+                        break;
+                    }
+                }
             }
         }
 
         if ( ! $sso_key ) {
-            kab_log( 'generate_eb_sso_url: No SSO secret key found. Checked: '
-                . implode( ', ', $key_options ) . ', eb_sso_settings' );
-
-            // Log all EB-related options for debugging.
-            global $wpdb;
-            $eb_opts = $wpdb->get_col(
-                "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE 'eb_%' OR option_name LIKE 'wdm_%'"
-            );
-            kab_log( 'generate_eb_sso_url: EB-related options: ' . implode( ', ', $eb_opts ) );
+            kab_log( 'generate_eb_sso_url: No SSO secret key found.' );
             return false;
         }
 
