@@ -259,7 +259,14 @@ class KAB_Login_Customizer {
         try {
             $moodle_url = self::get_moodle_redirect_url();
             if ( $moodle_url ) {
-                return $moodle_url;
+                // If EB SSO pending_moodle_target is already set, EB SSO will
+                // handle the redirect through its own SSO round-trip.
+                if ( self::$pending_moodle_target ) {
+                    return $redirect_to;
+                }
+                // Otherwise (e.g. "connect Telegram" flow for already logged-in users),
+                // route through the SSO handler to create a Moodle session.
+                return home_url( '/?kab_goto_lesson=1' );
             }
 
             $return_url = self::get_return_url();

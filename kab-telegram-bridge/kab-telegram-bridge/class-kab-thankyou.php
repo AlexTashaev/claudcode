@@ -69,13 +69,20 @@ class KAB_ThankYou {
             exit;
         }
 
-        $lesson_url = KAB_Settings::get( 'first_lesson_url' );
+        // Read lesson URL from cookie (set on Thank You page) or fall back to settings.
+        $lesson_url = '';
+        if ( ! empty( $_COOKIE['kab_moodle_redirect'] ) ) {
+            $lesson_url = esc_url_raw( wp_unslash( $_COOKIE['kab_moodle_redirect'] ) );
+        }
+        if ( ! $lesson_url ) {
+            $lesson_url = KAB_Settings::get( 'first_lesson_url' );
+        }
         if ( ! $lesson_url ) {
             wp_redirect( home_url() );
             exit;
         }
 
-        // Try to trigger EB SSO for the current user.
+        // Try to trigger EB SSO for the current user so they get a Moodle session.
         if ( function_exists( 'edwiser_bridge_instance' ) ) {
             $user = wp_get_current_user();
 
@@ -87,6 +94,8 @@ class KAB_ThankYou {
             kab_log( 'handle_lesson_redirect: Triggering EB SSO for user ' . $user->ID . ' → ' . $lesson_url );
 
             // Fire wp_login to trigger EB SSO (hooks at priority 10).
+            // Remove our own priority-8 handler to avoid redirect loop.
+            remove_action( 'wp_login', array( 'KAB_Login_Customizer', 'redirect_before_eb_sso' ), 8 );
             do_action( 'wp_login', $user->user_login, $user );
 
             // If EB SSO didn't redirect (exit), fall back to direct link.
