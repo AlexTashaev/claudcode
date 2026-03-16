@@ -257,15 +257,16 @@ class KAB_Login_Customizer {
      */
     public static function custom_redirect_after_login( $redirect_to, $user = null ) {
         try {
+            // If EB SSO target was set but SSO didn't redirect (exit),
+            // route through our SSO handler as fallback.
+            if ( self::$pending_moodle_target ) {
+                kab_log( 'custom_redirect_after_login: pending_moodle_target set, routing to SSO handler.' );
+                return home_url( '/?kab_goto_lesson=1' );
+            }
+
             $moodle_url = self::get_moodle_redirect_url();
             if ( $moodle_url ) {
-                // If EB SSO pending_moodle_target is already set, EB SSO will
-                // handle the redirect through its own SSO round-trip.
-                if ( self::$pending_moodle_target ) {
-                    return $redirect_to;
-                }
-                // Otherwise (e.g. "connect Telegram" flow for already logged-in users),
-                // route through the SSO handler to create a Moodle session.
+                kab_log( 'custom_redirect_after_login: moodle URL from cookie, routing to SSO handler.' );
                 return home_url( '/?kab_goto_lesson=1' );
             }
 
@@ -348,6 +349,13 @@ class KAB_Login_Customizer {
         if ( $return_url ) {
             kab_log( 'intercept_tg_redirect: Returning to ' . $return_url );
             return $return_url;
+        }
+
+        // TG callback with lesson redirect cookie → route through SSO handler
+        // so the user gets a Moodle session instead of landing on checkout.
+        if ( $is_tg_cb && ( ! empty( $_COOKIE['kab_moodle_redirect'] ) || self::$pending_moodle_target ) ) {
+            kab_log( 'intercept_tg_redirect: Lesson redirect found, routing to SSO handler.' );
+            return home_url( '/?kab_goto_lesson=1' );
         }
 
         return $location;

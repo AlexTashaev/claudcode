@@ -54,9 +54,9 @@ class KAB_ThankYou {
     /**
      * Handle ?kab_goto_lesson=1 — redirect to lesson through EB SSO.
      *
-     * When a logged-in WP user clicks "skip" on the Thank You page,
-     * they need a Moodle session. This handler triggers EB SSO so
-     * the user lands on the lesson already authenticated in Moodle.
+     * When a logged-in WP user clicks "skip" or finishes Telegram connect
+     * on the Thank You page, they need a Moodle session. This handler
+     * generates the EB SSO URL and redirects through Moodle's SSO endpoint.
      */
     public static function handle_lesson_redirect() {
         // phpcs:ignore WordPress.Security.NonceVerification
@@ -82,28 +82,140 @@ class KAB_ThankYou {
             exit;
         }
 
-        // Try to trigger EB SSO for the current user so they get a Moodle session.
-        if ( function_exists( 'edwiser_bridge_instance' ) ) {
-            $user = wp_get_current_user();
+        $user = wp_get_current_user();
+        kab_log( 'handle_lesson_redirect: user=' . $user->ID . ' email=' . $user->user_email . ' lesson=' . $lesson_url );
 
-            // Set the lesson URL as the SSO redirect target.
+        // Store lesson URL in transient for the global eb_sso_login_url filter.
+        set_transient( 'kab_lesson_sso_' . $user->ID, $lesson_url, 300 );
+
+        // --- Approach 1: Generate EB SSO URL directly ---
+        $sso_url = self::generate_eb_sso_url( $user, $lesson_url );
+        if ( $sso_url ) {
+            kab_log( 'handle_lesson_redirect: Generated EB SSO URL, redirecting.' );
+            wp_redirect( $sso_url );
+            exit;
+        }
+
+        // --- Approach 2: Try do_action('wp_login') to trigger EB SSO hooks ---
+        if ( function_exists( 'edwiser_bridge_instance' ) ) {
             add_filter( 'eb_sso_login_url', function () use ( $lesson_url ) {
                 return $lesson_url;
             }, 999 );
 
-            kab_log( 'handle_lesson_redirect: Triggering EB SSO for user ' . $user->ID . ' → ' . $lesson_url );
-
-            // Fire wp_login to trigger EB SSO (hooks at priority 10).
-            // Remove our own priority-8 handler to avoid redirect loop.
+            // Remove our own hooks to avoid interference.
             remove_action( 'wp_login', array( 'KAB_Login_Customizer', 'redirect_before_eb_sso' ), 8 );
-            do_action( 'wp_login', $user->user_login, $user );
+            remove_action( 'wp_login', array( 'KAB_Moodle_Linker', 'check_moodle_link_on_login' ), 5 );
+            remove_filter( 'wp_redirect', array( 'KAB_Login_Customizer', 'intercept_telegram_login_redirect' ), 999 );
 
-            // If EB SSO didn't redirect (exit), fall back to direct link.
-            kab_log( 'handle_lesson_redirect: EB SSO did not redirect, falling back to direct link.' );
+            // Log registered wp_login hooks for debugging.
+            global $wp_filter;
+            if ( isset( $wp_filter['wp_login'] ) ) {
+                foreach ( $wp_filter['wp_login']->callbacks as $pri => $hooks ) {
+                    foreach ( $hooks as $id => $_ ) {
+                        kab_log( "handle_lesson_redirect: wp_login hook[$pri]: $id" );
+                    }
+                }
+            }
+
+            kab_log( 'handle_lesson_redirect: Firing do_action(wp_login).' );
+            do_action( 'wp_login', $user->user_login, $user );
+            kab_log( 'handle_lesson_redirect: do_action(wp_login) did not redirect.' );
         }
 
+        // --- Approach 3: Fall back to direct Moodle URL ---
+        kab_log( 'handle_lesson_redirect: All SSO approaches failed. Falling back to direct URL: ' . $lesson_url );
         wp_redirect( $lesson_url );
         exit;
+    }
+
+    /**
+     * Try to generate an EB SSO URL by encrypting user data with the shared secret key.
+     *
+     * Reads Moodle URL and SSO secret from Edwiser Bridge options, encrypts
+     * user data in the format expected by Moodle's auth/edwiserbridge/sso.php,
+     * and returns the full SSO URL.
+     *
+     * @param WP_User $user        WordPress user.
+     * @param string  $redirect_to Lesson URL to redirect to after Moodle login.
+     * @return string|false SSO URL or false on failure.
+     */
+    private static function generate_eb_sso_url( $user, $redirect_to ) {
+        // --- Find Moodle base URL ---
+        $moodle_url = '';
+        $connection = get_option( 'eb_connection' );
+        if ( is_array( $connection ) && ! empty( $connection['eb_url'] ) ) {
+            $moodle_url = $connection['eb_url'];
+        }
+        if ( ! $moodle_url ) {
+            $moodle_url = get_option( 'eb_url', '' );
+        }
+        if ( ! $moodle_url ) {
+            kab_log( 'generate_eb_sso_url: No Moodle URL found in eb_connection/eb_url options.' );
+            return false;
+        }
+
+        // --- Find SSO secret key ---
+        $sso_key = '';
+
+        // EB SSO stores settings in different option names depending on version.
+        $key_options = array(
+            'eb_sso_secret_key',
+            'wdm_eb_sso_secret_key',
+        );
+        foreach ( $key_options as $opt ) {
+            $val = get_option( $opt, '' );
+            if ( $val ) {
+                $sso_key = $val;
+                break;
+            }
+        }
+
+        // Also check array-style settings.
+        if ( ! $sso_key ) {
+            $sso_settings = get_option( 'eb_sso_settings' );
+            if ( is_array( $sso_settings ) ) {
+                $sso_key = $sso_settings['eb_sso_secret_key']
+                    ?? $sso_settings['secret_key']
+                    ?? '';
+            }
+        }
+
+        if ( ! $sso_key ) {
+            kab_log( 'generate_eb_sso_url: No SSO secret key found. Checked: '
+                . implode( ', ', $key_options ) . ', eb_sso_settings' );
+
+            // Log all EB-related options for debugging.
+            global $wpdb;
+            $eb_opts = $wpdb->get_col(
+                "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE 'eb_%' OR option_name LIKE 'wdm_%'"
+            );
+            kab_log( 'generate_eb_sso_url: EB-related options: ' . implode( ', ', $eb_opts ) );
+            return false;
+        }
+
+        kab_log( 'generate_eb_sso_url: Found Moodle URL=' . $moodle_url . ' SSO key length=' . strlen( $sso_key ) );
+
+        // --- Build user data payload ---
+        $data = array(
+            'username'    => $user->user_login,
+            'email'       => $user->user_email,
+            'firstname'   => $user->first_name ?: $user->display_name,
+            'lastname'    => $user->last_name ?: '',
+            'redirect_to' => $redirect_to,
+        );
+
+        $json = wp_json_encode( $data );
+
+        // --- Encrypt (AES-128-ECB — standard EB SSO format) ---
+        $encrypted = openssl_encrypt( $json, 'AES-128-ECB', $sso_key, 0 );
+        if ( ! $encrypted ) {
+            kab_log( 'generate_eb_sso_url: AES-128-ECB encryption failed.' );
+            return false;
+        }
+
+        $sso_url = rtrim( $moodle_url, '/' ) . '/auth/edwiserbridge/sso.php?data=' . rawurlencode( $encrypted );
+        kab_log( 'generate_eb_sso_url: Generated URL (length=' . strlen( $sso_url ) . ')' );
+        return $sso_url;
     }
 
     /**
