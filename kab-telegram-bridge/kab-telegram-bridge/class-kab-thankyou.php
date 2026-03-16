@@ -17,6 +17,7 @@ class KAB_ThankYou {
     public static function init() {
         add_shortcode( 'kab_thankyou_block', array( __CLASS__, 'shortcode' ) );
         add_action( 'template_redirect', array( __CLASS__, 'set_lesson_cookie' ) );
+        add_action( 'template_redirect', array( __CLASS__, 'handle_lesson_redirect' ) );
     }
 
     /**
@@ -51,13 +52,59 @@ class KAB_ThankYou {
     }
 
     /**
+     * Handle ?kab_goto_lesson=1 — redirect to lesson through EB SSO.
+     *
+     * When a logged-in WP user clicks "skip" on the Thank You page,
+     * they need a Moodle session. This handler triggers EB SSO so
+     * the user lands on the lesson already authenticated in Moodle.
+     */
+    public static function handle_lesson_redirect() {
+        // phpcs:ignore WordPress.Security.NonceVerification
+        if ( empty( $_GET['kab_goto_lesson'] ) ) {
+            return;
+        }
+
+        if ( ! is_user_logged_in() ) {
+            wp_redirect( wp_login_url() );
+            exit;
+        }
+
+        $lesson_url = KAB_Settings::get( 'first_lesson_url' );
+        if ( ! $lesson_url ) {
+            wp_redirect( home_url() );
+            exit;
+        }
+
+        // Try to trigger EB SSO for the current user.
+        if ( function_exists( 'edwiser_bridge_instance' ) ) {
+            $user = wp_get_current_user();
+
+            // Set the lesson URL as the SSO redirect target.
+            add_filter( 'eb_sso_login_url', function () use ( $lesson_url ) {
+                return $lesson_url;
+            }, 999 );
+
+            kab_log( 'handle_lesson_redirect: Triggering EB SSO for user ' . $user->ID . ' → ' . $lesson_url );
+
+            // Fire wp_login to trigger EB SSO (hooks at priority 10).
+            do_action( 'wp_login', $user->user_login, $user );
+
+            // If EB SSO didn't redirect (exit), fall back to direct link.
+            kab_log( 'handle_lesson_redirect: EB SSO did not redirect, falling back to direct link.' );
+        }
+
+        wp_redirect( $lesson_url );
+        exit;
+    }
+
+    /**
      * [kab_thankyou_block] shortcode.
      *
      * Attributes:
-     *   lesson_url — override the default KAB_FIRST_LESSON_URL for this page.
+     *   lesson_url — override the default first lesson URL for this page.
      *
      * Two states:
-     *   1. Telegram NOT connected → show connect CTA + benefits list.
+     *   1. Telegram NOT connected → show Telegram login button + skip link.
      *   2. Telegram connected → show "Start lesson" button.
      *
      * @param array $atts Shortcode attributes.
@@ -81,25 +128,16 @@ class KAB_ThankYou {
             $tg_id = get_user_meta( $user->ID, WPTELEGRAM_USER_ID_META_KEY, true );
         }
 
+        // SSO-aware lesson link (goes through EB SSO to create Moodle session).
+        $lesson_sso_url = $lesson_url
+            ? home_url( '/?kab_goto_lesson=1' )
+            : '';
+
         ob_start();
         ?>
         <div class="kab-tq">
-            <div class="kab-tq-icon">🎉</div>
-            <h2 class="kab-tq-title">
-                <?php
-                echo $name
-                    ? 'Добро пожаловать, ' . esc_html( $name ) . '!'
-                    : 'Вы успешно записаны!';
-                ?>
-            </h2>
-
             <?php if ( ! $tg_id ) : ?>
-                <!-- Telegram ещё не привязан — CTA -->
-                <p class="kab-tq-sub">
-                    Нажмите одну кнопку — войдёте через Telegram<br>
-                    и сразу окажетесь на первом уроке
-                </p>
-
+                <!-- Telegram not connected — show login button -->
                 <div class="kab-tg-login-wrap">
                     <?php
                     if ( function_exists( 'wptelegram_login' ) ) {
@@ -112,43 +150,27 @@ class KAB_ThankYou {
                     ?>
                 </div>
 
-                <p class="kab-tq-bonus">
-                    ✔ Войдёте на сайт одним кликом в следующий раз<br>
-                    ✔ Будем присылать расписание и материалы в Telegram<br>
-                    ✔ Сразу попадёте на первый урок
-                </p>
-
-                <?php if ( $lesson_url ) : ?>
+                <?php if ( $lesson_sso_url ) : ?>
                     <p class="kab-tq-skip">
-                        <a href="<?php echo esc_url( $lesson_url ); ?>">
+                        <a href="<?php echo esc_url( $lesson_sso_url ); ?>">
                             Пропустить и перейти к уроку →
                         </a>
                     </p>
                 <?php endif; ?>
 
             <?php else : ?>
-                <!-- Telegram уже привязан — прямая кнопка на урок -->
-                <p class="kab-tq-sub">Telegram подключён. Первый урок уже ждёт вас:</p>
-
-                <?php if ( $lesson_url ) : ?>
-                    <a href="<?php echo esc_url( $lesson_url ); ?>" class="kab-btn-lesson">
+                <!-- Telegram connected — direct lesson button -->
+                <?php if ( $lesson_sso_url ) : ?>
+                    <a href="<?php echo esc_url( $lesson_sso_url ); ?>" class="kab-btn-lesson">
                         🎓 Начать первый урок →
                     </a>
                 <?php endif; ?>
-
-                <p class="kab-tq-bonus">
-                    ✔ Будем присылать расписание и материалы в Telegram
-                </p>
             <?php endif; ?>
         </div>
 
         <style>
         .kab-tq           { text-align:center; max-width:500px; margin:0 auto; padding:10px 0; }
-        .kab-tq-icon      { font-size:52px; margin-bottom:10px; }
-        .kab-tq-title     { font-size:24px; font-weight:800; margin:0 0 10px; }
-        .kab-tq-sub       { font-size:16px; color:#444; margin:0 0 22px; line-height:1.6; }
         .kab-tg-login-wrap { display:inline-block; transform:scale(1.25); margin:10px 0 18px; }
-        .kab-tq-bonus     { font-size:14px; color:#555; line-height:2; margin:18px 0 12px; text-align:left; display:inline-block; }
         .kab-tq-skip      { margin-top:10px; }
         .kab-tq-skip a    { font-size:13px; color:#aaa; text-decoration:underline; }
         .kab-tq-skip a:hover { color:#666; }
