@@ -116,6 +116,12 @@ class KAB_ThankYou {
             }
         }
 
+        // Capture the SSO redirect URL that EB SSO generates (for debugging).
+        add_filter( 'wp_redirect', function ( $url ) {
+            kab_log( 'handle_lesson_redirect: EB SSO native redirect URL=' . $url );
+            return $url;
+        }, 1 );
+
         kab_log( 'handle_lesson_redirect: Firing do_action(wp_login).' );
         do_action( 'wp_login', $user->user_login, $user );
         kab_log( 'handle_lesson_redirect: do_action(wp_login) did not redirect.' );
@@ -217,7 +223,20 @@ class KAB_ThankYou {
             return false;
         }
 
-        $sso_url = rtrim( $moodle_url, '/' ) . '/auth/edwiserbridge/sso.php?data=' . rawurlencode( $encrypted );
+        // --- Build SSO URL ---
+        // EB SSO versions use different Moodle paths:
+        //   Old: /auth/edwiserbridge/sso.php
+        //   New: /local/edwiserbridge/sso.php
+        // Try to detect from EB SSO settings, fall back to /local/ (newer).
+        $sso_path = '/local/edwiserbridge/sso.php';
+
+        // Check eb_sso_settings_redirection for clues about SSO path.
+        $redir_settings = get_option( 'eb_sso_settings_redirection' );
+        if ( is_array( $redir_settings ) ) {
+            kab_log( 'generate_eb_sso_url: Redirection settings = ' . wp_json_encode( $redir_settings ) );
+        }
+
+        $sso_url = rtrim( $moodle_url, '/' ) . $sso_path . '?data=' . rawurlencode( $encrypted );
         kab_log( 'generate_eb_sso_url: Generated URL (length=' . strlen( $sso_url ) . ')' );
         return $sso_url;
     }
