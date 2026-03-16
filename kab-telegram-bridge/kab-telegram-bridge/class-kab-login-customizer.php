@@ -307,13 +307,16 @@ class KAB_Login_Customizer {
             return $location;
         }
 
-        kab_log( 'intercept_tg_redirect v2.3.2: location=' . $location
-            . ' tg_cb=' . ( $is_tg_cb ? 'Y' : 'N' )
-            . ' cookie=' . ( ! empty( $_COOKIE['kab_moodle_redirect'] ) ? $_COOKIE['kab_moodle_redirect'] : 'none' )
-            . ' pending=' . ( self::$pending_moodle_target ?: 'none' ) );
+        kab_log( 'intercept_tg_redirect: location=' . $location );
 
         // Don't intercept redirects to our own pages.
         if ( false !== strpos( $location, 'telegram_link=1' ) ) {
+            return $location;
+        }
+
+        // Already heading to lesson SSO handler — let it through.
+        if ( false !== strpos( $location, 'kab_goto_lesson' ) ) {
+            kab_log( 'intercept_tg_redirect: Already routing to SSO handler, passing through.' );
             return $location;
         }
 
@@ -347,13 +350,6 @@ class KAB_Login_Customizer {
             $redirect   = $eb_page_id ? get_permalink( $eb_page_id ) : home_url();
             kab_log( 'intercept_tg_redirect: Linking flow (no Moodle), redirecting to ' . $redirect );
             return $redirect;
-        }
-
-        // TG callback with lesson redirect cookie → route through SSO handler.
-        // This MUST run before get_return_url() which returns the checkout page.
-        if ( $is_tg_cb && ( ! empty( $_COOKIE['kab_moodle_redirect'] ) || self::$pending_moodle_target ) ) {
-            kab_log( 'intercept_tg_redirect: Lesson redirect found, routing to SSO handler.' );
-            return home_url( '/?kab_goto_lesson=1' );
         }
 
         // WordPress return URL.
