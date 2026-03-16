@@ -307,6 +307,11 @@ class KAB_Login_Customizer {
             return $location;
         }
 
+        kab_log( 'intercept_tg_redirect v2.3.2: location=' . $location
+            . ' tg_cb=' . ( $is_tg_cb ? 'Y' : 'N' )
+            . ' cookie=' . ( ! empty( $_COOKIE['kab_moodle_redirect'] ) ? $_COOKIE['kab_moodle_redirect'] : 'none' )
+            . ' pending=' . ( self::$pending_moodle_target ?: 'none' ) );
+
         // Don't intercept redirects to our own pages.
         if ( false !== strpos( $location, 'telegram_link=1' ) ) {
             return $location;
