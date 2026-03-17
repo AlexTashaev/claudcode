@@ -88,16 +88,17 @@ class KAB_ThankYou {
         // Store lesson URL in transient for the global eb_sso_login_url filter.
         set_transient( 'kab_lesson_sso_' . $user->ID, $lesson_url, 300 );
 
-        // --- Approach 1: Generate EB SSO URL directly ---
-        $sso_url = self::generate_eb_sso_url( $user, $lesson_url );
-        if ( $sso_url ) {
-            kab_log( 'handle_lesson_redirect: Generated EB SSO URL, redirecting.' );
-            wp_redirect( $sso_url );
-            exit;
-        }
-
-        // --- Approach 2: Try do_action('wp_login') to trigger EB SSO hooks ---
+        // --- Trigger EB SSO via do_action('wp_login') ---
+        // We override the SSO target URL so the user lands on the lesson.
         add_filter( 'eb_sso_login_url', function () use ( $lesson_url ) {
+            kab_log( 'handle_lesson_redirect: eb_sso_login_url filter called, returning ' . $lesson_url );
+            return $lesson_url;
+        }, 999 );
+
+        // Also override via set_sso_redirect_url (used during normal login flow).
+        self::$pending_moodle_target = $lesson_url;
+        add_filter( 'eb_sso_login_redirect_url', function () use ( $lesson_url ) {
+            kab_log( 'handle_lesson_redirect: eb_sso_login_redirect_url filter, returning ' . $lesson_url );
             return $lesson_url;
         }, 999 );
 
@@ -116,9 +117,9 @@ class KAB_ThankYou {
             }
         }
 
-        // Capture the SSO redirect URL that EB SSO generates (for debugging).
+        // Capture the SSO redirect URL that EB SSO generates.
         add_filter( 'wp_redirect', function ( $url ) {
-            kab_log( 'handle_lesson_redirect: EB SSO native redirect URL=' . $url );
+            kab_log( 'handle_lesson_redirect: wp_redirect captured URL=' . $url );
             return $url;
         }, 1 );
 
@@ -126,8 +127,8 @@ class KAB_ThankYou {
         do_action( 'wp_login', $user->user_login, $user );
         kab_log( 'handle_lesson_redirect: do_action(wp_login) did not redirect.' );
 
-        // --- Approach 3: Fall back to direct Moodle URL ---
-        kab_log( 'handle_lesson_redirect: All SSO approaches failed. Falling back to direct URL: ' . $lesson_url );
+        // --- Fallback: direct Moodle URL (no SSO session) ---
+        kab_log( 'handle_lesson_redirect: Falling back to direct URL: ' . $lesson_url );
         wp_redirect( $lesson_url );
         exit;
     }
