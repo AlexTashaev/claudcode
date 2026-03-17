@@ -4,7 +4,7 @@
  * Description: Customizes WP Telegram Login integration for kabacademy.com.
  *              Enforces existing-users-only login, ensures Moodle linking via
  *              Edwiser Bridge, and provides custom widget placement.
- * Version: 2.3.5
+ * Version: 2.4.0
  * Author: KAB Academy
  */
 
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'KAB_TELEGRAM_BRIDGE_DIR', plugin_dir_path( __FILE__ ) . 'kab-telegram-bridge/' );
-define( 'KAB_TELEGRAM_BRIDGE_VER', '2.3.5' );
+define( 'KAB_TELEGRAM_BRIDGE_VER', '2.4.0' );
 
 // ============================================================
 // SendPulse & Lesson settings — change these for your setup.

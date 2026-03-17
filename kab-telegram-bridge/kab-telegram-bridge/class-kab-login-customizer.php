@@ -257,17 +257,11 @@ class KAB_Login_Customizer {
      */
     public static function custom_redirect_after_login( $redirect_to, $user = null ) {
         try {
-            // If EB SSO target was set but SSO didn't redirect (exit),
-            // route through our SSO handler as fallback.
-            if ( self::$pending_moodle_target ) {
-                kab_log( 'custom_redirect_after_login: pending_moodle_target set, routing to SSO handler.' );
-                return home_url( '/?kab_goto_lesson=1' );
-            }
-
-            $moodle_url = self::get_moodle_redirect_url();
+            // Moodle lesson URL — redirect directly.
+            $moodle_url = self::$pending_moodle_target ?: self::get_moodle_redirect_url();
             if ( $moodle_url ) {
-                kab_log( 'custom_redirect_after_login: moodle URL from cookie, routing to SSO handler.' );
-                return home_url( '/?kab_goto_lesson=1' );
+                kab_log( 'custom_redirect_after_login: redirecting to lesson URL: ' . $moodle_url );
+                return $moodle_url;
             }
 
             $return_url = self::get_return_url();
@@ -309,21 +303,13 @@ class KAB_Login_Customizer {
 
         kab_log( 'intercept_tg_redirect: location=' . $location );
 
-        // Don't intercept redirects to our own pages.
-        if ( false !== strpos( $location, 'telegram_link=1' ) ) {
-            return $location;
-        }
-
-        // Already heading to lesson SSO handler — let it through.
-        if ( false !== strpos( $location, 'kab_goto_lesson' ) ) {
-            kab_log( 'intercept_tg_redirect: Already routing to SSO handler, passing through.' );
-            return $location;
-        }
-
-        // If pending_moodle_target is set, eb_sso_login_url already handles the
-        // redirect destination. Let EB SSO's redirect pass through normally.
-        if ( self::$pending_moodle_target && false !== strpos( $location, '/auth/edwiserbridge/' ) ) {
-            kab_log( 'intercept_tg_redirect: EB SSO redirect with target set via filter, passing through.' );
+        // Don't intercept redirects to our own pages or Moodle URLs.
+        if ( false !== strpos( $location, 'telegram_link=1' )
+            || false !== strpos( $location, 'kab_goto_lesson' )
+            || self::is_allowed_moodle_url( $location )
+            || false !== strpos( $location, '/edwiserbridge/' )
+        ) {
+            kab_log( 'intercept_tg_redirect: Passing through: ' . $location );
             return $location;
         }
 
